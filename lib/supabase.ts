@@ -63,3 +63,39 @@ export interface Usuario {
   created_at?: string
   updated_at?: string
 }
+
+// Interface para a tabela de categorias personalizadas
+export interface CategoriaUsuario {
+  id: number
+  user_id: string
+  nome: string
+  cor: string
+  created_at?: string
+  updated_at?: string
+}
+
+// Interface para bancos
+export interface Banco {
+  id: number
+  nome: string
+  codigo: string
+  created_at?: string
+}
+
+// Interface para configurações do usuário
+export interface ConfiguracaoUsuario {
+  id: number
+  user_id: string
+  configuracoes: {
+    nome?: string
+    telefone?: string
+    bancos_selecionados: number[]
+    categorias: Array<{
+      id: string
+      nome: string
+      cor: string
+    }>
+  }
+  created_at?: string
+  updated_at?: string
+}

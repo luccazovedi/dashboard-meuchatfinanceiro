@@ -5,6 +5,43 @@ const hashPassword = (password: string): string => {
   return btoa(password) // Base64 encoding
 }
 
+const validatePasswordAndLogin = async (usuario: Usuario, password: string, setUser: (user: User | null) => void) => {
+  // Verificar senha - testando múltiplas possibilidades
+  const senhaHash = hashPassword(password)
+  
+  let senhaValida = false
+  
+  // Teste 1: Senha em texto plano
+  if (usuario.senha === password) {
+    senhaValida = true
+  }
+  // Teste 2: Senha com hash base64
+  else if (usuario.senha === senhaHash) {
+    senhaValida = true
+  }
+  // Teste 3: Comparação case-insensitive
+  else if (usuario.senha?.toLowerCase() === password.toLowerCase()) {
+    senhaValida = true
+  }
+  
+  if (!senhaValida) {
+    throw new Error('Senha incorreta')
+  }
+
+  // Criar objeto de usuário logado
+  const userLogado: User = {
+    id: usuario.id.toString(),
+    email: usuario.email,
+    name: usuario.nome,
+    created_at: usuario.created_at
+  }
+
+  setUser(userLogado)
+  localStorage.setItem('currentUser', JSON.stringify(userLogado))
+  
+  return { user: userLogado }
+}
+
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
@@ -18,59 +55,74 @@ export function useAuth() {
     setLoading(false)
   }, [])
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (identifier: string, password: string) => {
     try {
-      // Buscar usuário na tabela personalizada
-      const { data: usuarios, error } = await supabase
-        .from('usuario')
-        .select('*')
-        .eq('email', email)
-        .limit(1)
-      
+      let usuarios: Usuario[] | null = null
+      let error: any = null
+
+      console.log('Tentando fazer login com:', identifier)
+      console.log('Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL)
+
+      // Verificar se é email (contém @)
+      if (identifier.includes('@')) {
+        console.log('Detectado como email')
+        const result = await supabase
+          .from('usuarios')
+          .select('*')
+          .eq('email', identifier)
+          .limit(1)
+        
+        console.log('Resultado da busca por email:', result)
+        usuarios = result.data
+        error = result.error
+      }
+      // Verificar se é telefone (só números, parênteses, espaços e hífens)
+      else if (/^[\d\s\(\)\-\+]+$/.test(identifier)) {
+        console.log('Detectado como telefone')
+        // Normalizar o telefone removendo caracteres especiais para a busca
+        const telefoneNormalizado = identifier.replace(/[\s\(\)\-]/g, '')
+        
+        const result = await supabase
+          .from('usuarios')
+          .select('*')
+          .or(`telefone.eq.${identifier},telefone.eq.${telefoneNormalizado}`)
+          .limit(1)
+        
+        console.log('Resultado da busca por telefone:', result)
+        usuarios = result.data
+        error = result.error
+      }
+      // Caso contrário, assumir que é nome de usuário
+      else {
+        console.log('Detectado como usuário')
+        const result = await supabase
+          .from('usuarios')
+          .select('*')
+          .eq('usuario', identifier)
+          .limit(1)
+        
+        console.log('Resultado da busca por usuário:', result)
+        usuarios = result.data
+        error = result.error
+      }
+
       if (error) {
-        throw new Error('Erro ao conectar com o banco de dados')
+        console.error('Erro do Supabase:', error)
+        throw new Error(`Erro ao conectar com o banco de dados: ${error.message}`)
       }
 
       if (!usuarios || usuarios.length === 0) {
-        throw new Error('Email não encontrado')
+        if (identifier.includes('@')) {
+          throw new Error('Email não encontrado')
+        } else if (/^[\d\s\(\)\-\+]+$/.test(identifier)) {
+          throw new Error('Telefone não encontrado')
+        } else {
+          throw new Error('Usuário não encontrado')
+        }
       }
 
       const usuario = usuarios[0] as Usuario
-
-      // Verificar senha - testando múltiplas possibilidades
-      const senhaHash = hashPassword(password)
-      
-      let senhaValida = false
-      
-      // Teste 1: Senha em texto plano
-      if (usuario.senha === password) {
-        senhaValida = true
-      }
-      // Teste 2: Senha com hash base64
-      else if (usuario.senha === senhaHash) {
-        senhaValida = true
-      }
-      // Teste 3: Comparação case-insensitive
-      else if (usuario.senha?.toLowerCase() === password.toLowerCase()) {
-        senhaValida = true
-      }
-      
-      if (!senhaValida) {
-        throw new Error('Senha incorreta')
-      }
-
-      // Criar objeto de usuário logado
-      const userLogado: User = {
-        id: usuario.id.toString(),
-        email: usuario.email,
-        name: usuario.nome,
-        created_at: usuario.created_at
-      }
-
-      setUser(userLogado)
-      localStorage.setItem('currentUser', JSON.stringify(userLogado))
-      
-      return { user: userLogado }
+      return await validatePasswordAndLogin(usuario, password, setUser)
 
     } catch (err) {
       throw err
@@ -81,7 +133,7 @@ export function useAuth() {
     try {
       // Verificar se o email já existe
       const { data: existingUser } = await supabase
-        .from('usuario')
+        .from('usuarios')
         .select('email')
         .eq('email', email)
         .limit(1)
@@ -93,11 +145,11 @@ export function useAuth() {
       // Criar novo usuário na tabela personalizada
       const senhaHash = hashPassword(password)
       const { data, error } = await supabase
-        .from('usuario')
+        .from('usuarios')
         .insert([
           {
             email,
-            senha: senhaHash, // ou apenas password se não usar hash
+            senha: senhaHash,
             nome: name
           }
         ])
@@ -117,18 +169,11 @@ export function useAuth() {
     localStorage.removeItem('currentUser')
   }
 
-  const resetPassword = async (email: string) => {
-    // Para implementar reset de senha com tabela personalizada
-    // você precisaria criar uma lógica própria (envio de email, etc.)
-    throw new Error('Reset de senha não implementado para tabela personalizada')
-  }
-
   return {
     user,
     loading,
     signIn,
     signUp,
-    signOut,
-    resetPassword
+    signOut
   }
 }

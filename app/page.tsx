@@ -1,8 +1,9 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { ArrowDownIcon, ArrowUpIcon, CalendarIcon, TrendingUpIcon, WalletIcon, FilterIcon, XIcon, EyeIcon, EyeOffIcon, LogOutIcon, MessageCircleIcon, SunIcon, MoonIcon, PlusIcon, EditIcon, TrashIcon } from "lucide-react"
+import { ArrowDownIcon, ArrowUpIcon, CalendarIcon, TrendingUpIcon, WalletIcon, FilterIcon, XIcon, EyeIcon, EyeOffIcon, LogOutIcon, MessageCircleIcon, SunIcon, MoonIcon, PlusIcon, EditIcon, TrashIcon, SettingsIcon } from "lucide-react"
 import { useTheme } from "next-themes"
+import Link from "next/link"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -39,9 +40,10 @@ export default function HomePage() {
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState("")
+  const [nomeUsuario, setNomeUsuario] = useState("")
   const [formData, setFormData] = useState({
     email: "",
-    password: ""
+    senha: ""
   })
 
   // Estados do dashboard
@@ -64,6 +66,31 @@ export default function HomePage() {
     // Componente inicializado
   }, [])
 
+  // Carregar nome do usuário do banco de dados
+  useEffect(() => {
+    const carregarNomeUsuario = async () => {
+      if (user && user.email) {
+        try {
+          const { data, error } = await supabase
+            .from('usuarios')
+            .select('nome')
+            .eq('email', user.email)
+            .single()
+          
+          if (!error && data) {
+            setNomeUsuario(data.nome || user.email)
+          } else {
+            setNomeUsuario(user.email)
+          }
+        } catch (err) {
+          setNomeUsuario(user.email)
+        }
+      }
+    }
+
+    carregarNomeUsuario()
+  }, [user])
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
     setFormData(prev => ({
@@ -79,10 +106,10 @@ export default function HomePage() {
     setError("")
 
     try {
-      const data = await signIn(formData.email, formData.password)
-      
+      const data = await signIn(formData.email, formData.senha)
+
       if (data.user) {
-        setFormData({ email: "", password: "" })
+        setFormData({ email: "", senha: "" })
         setError("")
       }
     } catch (err) {
@@ -96,7 +123,7 @@ export default function HomePage() {
   const handleLogout = async () => {
     try {
       await signOut()
-      setFormData({ email: "", password: "" })
+      setFormData({ email: "", senha: "" })
       setError("")
     } catch (err) {
       // Silenciar erro de logout
@@ -279,18 +306,18 @@ export default function HomePage() {
               Dashboard Financeiro
             </CardTitle>
             <CardDescription className="text-center">
-              Entre com suas credenciais para acessar o dashboard
+              Entre com seu email, usuário ou telefone para acessar o dashboard
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">Email, Usuário ou Telefone</Label>
                 <Input
                   id="email"
                   name="email"
-                  type="email"
-                  placeholder="seu@email.com"
+                  type="text"
+                  placeholder="email@exemplo.com, usuario ou (11) 99999-9999"
                   value={formData.email}
                   onChange={handleInputChange}
                   required
@@ -302,11 +329,11 @@ export default function HomePage() {
                 <Label htmlFor="password">Senha</Label>
                 <div className="relative">
                   <Input
-                    id="password"
-                    name="password"
+                    id="senha"
+                    name="senha"
                     type={showPassword ? "text" : "password"}
                     placeholder="Sua senha"
-                    value={formData.password}
+                    value={formData.senha}
                     onChange={handleInputChange}
                     required
                     disabled={isLoading}
@@ -329,6 +356,11 @@ export default function HomePage() {
                 </div>
               </div>
 
+              {error && (
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
               
               <Button
                 type="submit"
@@ -352,9 +384,21 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <span className="text-sm text-gray-600 dark:text-gray-300">Bem-vindo,</span>
-            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{user?.email}</span>
+            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{nomeUsuario || user?.email}</span>
           </div>
           <div className="flex items-center space-x-2">
+            {/* Botão de Configuração */}
+            <Link href="/dashboard/configuracoes">
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex items-center space-x-2"
+              >
+                <SettingsIcon className="h-4 w-4" />
+                <span>Configurações</span>
+              </Button>
+            </Link>
+            
             {/* Botão WhatsApp */}
             <Button
               variant="outline"
