@@ -60,25 +60,18 @@ export function useAuth() {
       let usuarios: Usuario[] | null = null
       let error: any = null
 
-      console.log('Tentando fazer login com:', identifier)
-      console.log('Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL)
-
       // Verificar se é email (contém @)
       if (identifier.includes('@')) {
-        console.log('Detectado como email')
         const result = await supabase
           .from('usuarios')
           .select('*')
           .eq('email', identifier)
           .limit(1)
-        
-        console.log('Resultado da busca por email:', result)
         usuarios = result.data
         error = result.error
       }
       // Verificar se é telefone (só números, parênteses, espaços e hífens)
       else if (/^[\d\s\(\)\-\+]+$/.test(identifier)) {
-        console.log('Detectado como telefone')
         // Normalizar o telefone removendo caracteres especiais para a busca
         const telefoneNormalizado = identifier.replace(/[\s\(\)\-]/g, '')
         
@@ -88,26 +81,22 @@ export function useAuth() {
           .or(`telefone.eq.${identifier},telefone.eq.${telefoneNormalizado}`)
           .limit(1)
         
-        console.log('Resultado da busca por telefone:', result)
         usuarios = result.data
         error = result.error
       }
       // Caso contrário, assumir que é nome de usuário
       else {
-        console.log('Detectado como usuário')
         const result = await supabase
           .from('usuarios')
           .select('*')
           .eq('usuario', identifier)
           .limit(1)
         
-        console.log('Resultado da busca por usuário:', result)
         usuarios = result.data
         error = result.error
       }
 
       if (error) {
-        console.error('Erro do Supabase:', error)
         throw new Error(`Erro ao conectar com o banco de dados: ${error.message}`)
       }
 

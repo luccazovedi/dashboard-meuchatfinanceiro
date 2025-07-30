@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { ArrowDownIcon, ArrowUpIcon, CalendarIcon, TrendingUpIcon, WalletIcon, FilterIcon, XIcon, EyeIcon, EyeOffIcon, LogOutIcon, MessageCircleIcon, SunIcon, MoonIcon, PlusIcon, EditIcon, TrashIcon, SettingsIcon, MenuIcon, CreditCardIcon, FileTextIcon, ClockIcon, AlertTriangleIcon, Target, Building, DollarSign } from "lucide-react"
+import { ArrowDownIcon, ArrowUpIcon, CalendarIcon, TrendingUpIcon, WalletIcon, FilterIcon, XIcon, EyeIcon, EyeOffIcon, LogOutIcon, MessageCircleIcon, SunIcon, MoonIcon, PlusIcon, EditIcon, TrashIcon, SettingsIcon, MenuIcon, CreditCardIcon, FileTextIcon, ClockIcon, AlertTriangleIcon } from "lucide-react"
 import { useTheme } from "next-themes"
 import Link from "next/link"
 
@@ -14,9 +14,8 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Progress } from "@/components/ui/progress"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 
 // Importações do Supabase
 import { useAuth } from "@/hooks/useAuth"
@@ -65,19 +64,7 @@ export default function HomePage() {
     deleteTransacao
   } = useTransacoes()
   const { investimentos, loading: investimentosLoading, error: investimentosError } = useInvestimentos()
-  const { 
-    metas, 
-    loading: metasLoading, 
-    error: metasError,
-    addMeta,
-    updateMeta,
-    deleteMeta,
-    updateValorAtual,
-    getProgressoMeta,
-    getMetasProximasVencimento,
-    getTotalEconomizado,
-    getTotalObjetivo
-  } = useMetas()
+  const { metas, loading: metasLoading, error: metasError } = useMetas()
   const { despesas, loading: despesasLoading, error: despesasError } = useDespesas()
   const { entradas, loading: entradasLoading, error: entradasError } = useEntradas()
   const { contas: contasAPagar, loading: contasLoading, error: contasError } = useContasAPagar()
@@ -87,6 +74,16 @@ export default function HomePage() {
   const { contas: contasBancarias, loading: contasBancariasLoading, error: contasBancariasError } = useContasBancarias()
   const { cartoes: cartoesCredito, loading: cartoesCreditoLoading, error: cartoesCreditoError } = useCartoesCredito()
   const { tipos: tiposPagamento, loading: tiposPagamentoLoading, error: tiposPagamentoError } = useTiposPagamento()
+  
+  // Debug logs
+  useEffect(() => {
+    console.log('🔍 Debug - Dados carregados:')
+    console.log('📊 Contas bancárias:', contasBancarias.length, contasBancarias)
+    console.log('💳 Cartões de crédito:', cartoesCredito.length, cartoesCredito)
+    console.log('💰 Tipos de pagamento (banco):', tiposPagamento.length, tiposPagamento)
+    console.log('� Tipos de pagamento (usando):', tiposPagamentoParaUsar.length, tiposPagamentoParaUsar)
+    console.log('�👤 Usuário logado:', user?.id)
+  }, [contasBancarias, cartoesCredito, tiposPagamento, user])
   
   // Categorias de fallback caso não carregue do banco
   const categoriasFallback = [
@@ -116,6 +113,16 @@ export default function HomePage() {
   // Usar tipos de pagamento do banco ou fallback (sempre exibir)
   const tiposPagamentoParaUsar = tiposPagamento.length > 0 ? tiposPagamento : tiposPagamentoFallback
   
+  // Debug logs
+  useEffect(() => {
+    console.log('🔍 Debug - Dados carregados:')
+    console.log('📊 Contas bancárias:', contasBancarias.length, contasBancarias)
+    console.log('💳 Cartões de crédito:', cartoesCredito.length, cartoesCredito)
+    console.log('💰 Tipos de pagamento (banco):', tiposPagamento.length, tiposPagamento)
+    console.log('🎭 Tipos de pagamento (usando):', tiposPagamentoParaUsar.length, tiposPagamentoParaUsar)
+    console.log('👤 Usuário logado:', user?.id)
+  }, [contasBancarias, cartoesCredito, tiposPagamento, tiposPagamentoParaUsar, user])
+  
   // Estados locais
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
@@ -130,26 +137,6 @@ export default function HomePage() {
   const [filtroTransacao, setFiltroTransacao] = useState("todas")
   const [periodoSelecionado, setPeriodoSelecionado] = useState("mes-atual")
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  
-  // Estados da sidebar detalhada
-  const [sidebarAberta, setSidebarAberta] = useState(false)
-  const [tipoSidebarAtivo, setTipoSidebarAtivo] = useState<string>("")
-  
-  // Estados para metas
-  const [modalMetaAberto, setModalMetaAberto] = useState(false)
-  const [metaEditando, setMetaEditando] = useState<Meta | null>(null)
-  const [modalUpdateValueAberto, setModalUpdateValueAberto] = useState(false)
-  const [metaParaAtualizar, setMetaParaAtualizar] = useState<Meta | null>(null)
-  const [novoValorMeta, setNovoValorMeta] = useState("")
-  const [formMeta, setFormMeta] = useState({
-    titulo: "",
-    descricao: "",
-    valor_meta: "",
-    valor_atual: "",
-    categoria: "",
-    prazo: "",
-    status: "ativa" as Meta['status']
-  })
   
   // Estados do modal de transação
   const [modalTransacaoAberto, setModalTransacaoAberto] = useState(false)
@@ -247,17 +234,6 @@ export default function HomePage() {
 
   const toggleTheme = () => {
     setTheme(theme === 'dark' ? 'light' : 'dark')
-  }
-
-  // Função para abrir sidebar com detalhes específicos
-  const abrirSidebar = (tipo: string) => {
-    setTipoSidebarAtivo(tipo)
-    setSidebarAberta(true)
-  }
-
-  const fecharSidebar = () => {
-    setSidebarAberta(false)
-    setTipoSidebarAtivo("")
   }
 
   // Função para filtrar categorias baseada no tipo selecionado
@@ -358,6 +334,11 @@ export default function HomePage() {
     setIsLoading(true)
 
     try {
+      console.log('🎯 Iniciando salvamento de transação')
+      console.log('📋 Dados do formulário:', formTransacao)
+      console.log('👤 Usuário:', user?.id)
+      console.log('🏷️ Categorias disponíveis:', categoriasParaUsar.length)
+      
       let valor = parseFloat(formTransacao.valor)
       
       // Ajustar sinal do valor baseado no tipo
@@ -373,12 +354,16 @@ export default function HomePage() {
       if (formTransacao.tipo === 'transferencia') {
         // Para transferências, usar categoria fixa ID 13
         categoria_id = 13
+        console.log('🔄 Transferência: usando categoria ID 13 automaticamente')
       } else {
         // Para outros tipos, buscar categoria baseada no nome selecionado
         const categoriasFiltradas = getCategoriasPorTipo(formTransacao.tipo)
         const categoria = categoriasFiltradas.find(c => c.nome === formTransacao.categoria)
+        console.log('🔍 Categoria encontrada:', categoria)
+        console.log('🏷️ Categorias filtradas para', formTransacao.tipo, ':', categoriasFiltradas.length)
         
         if (!categoria) {
+          console.error('❌ Categoria não encontrada:', formTransacao.categoria)
           setError('Categoria não encontrada')
           return
         }
@@ -397,15 +382,21 @@ export default function HomePage() {
         cartao_credito_id: formTransacao.cartao_credito_id ? parseInt(formTransacao.cartao_credito_id) : undefined,
         tipo_pagamento_id: formTransacao.tipo_pagamento_id ? parseInt(formTransacao.tipo_pagamento_id) : undefined
       }
+      
+      console.log('📤 Dados preparados para envio:', transacaoData)
 
       if (transacaoEditando) {
+        console.log('✏️ Editando transação existente')
         await updateTransacao(transacaoEditando.id, transacaoData)
       } else {
+        console.log('➕ Criando nova transação')
         await addTransacao(transacaoData)
       }
 
+      console.log('✅ Transação salva com sucesso!')
       fecharModalTransacao()
     } catch (err) {
+      console.error('💥 Erro ao salvar transação:', err)
       setError(err instanceof Error ? err.message : 'Erro ao salvar transação')
     } finally {
       setIsLoading(false)
@@ -420,126 +411,6 @@ export default function HomePage() {
         setError(err instanceof Error ? err.message : 'Erro ao excluir transação')
       }
     }
-  }
-
-  // Funções para gerenciar metas
-  const resetFormMeta = () => {
-    setFormMeta({
-      titulo: "",
-      descricao: "",
-      valor_meta: "",
-      valor_atual: "",
-      categoria: "",
-      prazo: "",
-      status: "ativa"
-    })
-  }
-
-  const abrirModalMeta = (meta?: Meta) => {
-    if (meta) {
-      setMetaEditando(meta)
-      setFormMeta({
-        titulo: meta.titulo,
-        descricao: meta.descricao || "",
-        valor_meta: meta.valor_meta.toString(),
-        valor_atual: meta.valor_atual.toString(),
-        categoria: meta.categoria,
-        prazo: meta.prazo || "",
-        status: meta.status
-      })
-    } else {
-      setMetaEditando(null)
-      resetFormMeta()
-    }
-    setModalMetaAberto(true)
-  }
-
-  const fecharModalMeta = () => {
-    setModalMetaAberto(false)
-    setMetaEditando(null)
-    resetFormMeta()
-  }
-
-  const handleSubmitMeta = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-
-    try {
-      const metaData = {
-        titulo: formMeta.titulo,
-        descricao: formMeta.descricao,
-        valor_meta: parseFloat(formMeta.valor_meta),
-        valor_atual: parseFloat(formMeta.valor_atual) || 0,
-        categoria: formMeta.categoria,
-        prazo: formMeta.prazo || undefined,
-        status: formMeta.status
-      }
-
-      if (metaEditando) {
-        await updateMeta(metaEditando.id, metaData)
-      } else {
-        await addMeta(metaData)
-      }
-
-      fecharModalMeta()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao salvar meta')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleDeleteMeta = async (id: number) => {
-    if (confirm('Tem certeza que deseja excluir esta meta?')) {
-      try {
-        await deleteMeta(id)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Erro ao excluir meta')
-      }
-    }
-  }
-
-  const abrirModalUpdateValue = (meta: Meta) => {
-    setMetaParaAtualizar(meta)
-    setNovoValorMeta(meta.valor_atual.toString())
-    setModalUpdateValueAberto(true)
-  }
-
-  const fecharModalUpdateValue = () => {
-    setModalUpdateValueAberto(false)
-    setMetaParaAtualizar(null)
-    setNovoValorMeta("")
-  }
-
-  const handleUpdateValueMeta = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-
-    try {
-      if (!metaParaAtualizar) return
-
-      await updateValorAtual(metaParaAtualizar.id, parseFloat(novoValorMeta))
-      fecharModalUpdateValue()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao atualizar valor da meta')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleInputMetaChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target
-    setFormMeta(prev => ({
-      ...prev,
-      [name]: value
-    }))
-  }
-
-  const handleSelectMetaChange = (name: string, value: string) => {
-    setFormMeta(prev => ({
-      ...prev,
-      [name]: value
-    }))
   }
 
   // Usar dados diretos do banco de dados Supabase
@@ -558,22 +429,22 @@ export default function HomePage() {
     .filter((t: Transacao) => t.tipo === "entrada")
     .reduce((sum: number, t: Transacao) => sum + t.valor, 0)
   
-  const totalDespesas = Math.abs(transacoes
+  const totalSaidas = Math.abs(transacoes
     .filter((t: Transacao) => t.tipo === "despesa")
     .reduce((sum: number, t: Transacao) => sum + t.valor, 0))
   
-  const totalInvestimentosTransacoes = Math.abs(transacoes
+  const totalInvestimentos = Math.abs(transacoes
     .filter((t: Transacao) => t.tipo === "investimento")
     .reduce((sum: number, t: Transacao) => sum + t.valor, 0))
   
-  // Total de investimentos reais (da tabela investimentos)
-  const totalInvestimentosReais = investimentos
-    .reduce((sum: number, inv: Investimento) => sum + (inv.valor_investimento || 0), 0)
-  
-  // Usar investimentos reais se existirem, senão usar das transações
-  const totalInvestimentos = totalInvestimentosReais > 0 ? totalInvestimentosReais : totalInvestimentosTransacoes
-  
-  const saldoAtual = totalEntradas - totalDespesas - totalInvestimentosTransacoes
+  const saldoAtual = totalEntradas - totalSaidas - totalInvestimentos
+
+  // Debug dos totais
+  console.log('📊 Debug dos totais:')
+  console.log('💰 Total Entradas:', totalEntradas, 'de', transacoes.filter(t => t.tipo === "entrada").length, 'transações')
+  console.log('💸 Total Saídas:', totalSaidas, 'de', transacoes.filter(t => t.tipo === "despesa").length, 'transações')
+  console.log('📈 Total Investimentos:', totalInvestimentos, 'de', transacoes.filter(t => t.tipo === "investimento").length, 'transações')
+  console.log('🏦 Saldo Atual:', saldoAtual)
 
   const formatarMoeda = (valor: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -707,7 +578,31 @@ export default function HomePage() {
           
           {/* Menu Desktop */}
           <div className="hidden md:flex items-center space-x-2">
-             {/* Botão WhatsApp */}
+            {/* Botão de Contas a Pagar */}
+            <Link href="/dashboard/contas-a-pagar">
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex items-center space-x-2"
+              >
+                <AlertTriangleIcon className="h-4 w-4" />
+                <span>Contas a Pagar</span>
+              </Button>
+            </Link>
+            
+            {/* Botão de Configuração */}
+            <Link href="/dashboard/configuracoes">
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex items-center space-x-2"
+              >
+                <SettingsIcon className="h-4 w-4" />
+                <span>Configurações</span>
+              </Button>
+            </Link>
+            
+            {/* Botão WhatsApp */}
             <Button
               variant="outline"
               size="sm"
@@ -717,16 +612,6 @@ export default function HomePage() {
               <MessageCircleIcon className="h-4 w-4" />
               <span>Fale com o Fin</span>
             </Button>
-            {/* Botão de Configuração */}
-            <Link href="/dashboard/configuracoes">
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex items-center space-x-2"
-              >
-                <SettingsIcon className="h-4 w-4" />
-              </Button>
-            </Link>
             
             {/* Toggle de tema */}
             <Button
@@ -774,16 +659,22 @@ export default function HomePage() {
                   <MenuIcon className="h-4 w-4" />
                 </Button>
               </SheetTrigger>
-              <SheetContent 
-                side="right" 
-                className="w-[300px] sm:w-[400px]"
-                onOpenAutoFocus={(e) => e.preventDefault()}
-                onCloseAutoFocus={(e) => e.preventDefault()}
-              >
+              <SheetContent side="right" className="w-[300px] sm:w-[400px]">
                 <SheetHeader>
                   <SheetTitle>Menu</SheetTitle>
                 </SheetHeader>
                 <div className="flex flex-col space-y-4 mt-8">
+                  {/* Botão de Contas a Pagar */}
+                  <Link href="/dashboard/contas-a-pagar" onClick={() => setMobileMenuOpen(false)}>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start flex items-center space-x-2"
+                    >
+                      <AlertTriangleIcon className="h-4 w-4" />
+                      <span>Contas a Pagar</span>
+                    </Button>
+                  </Link>
+                  
                   {/* Botão de Configuração */}
                   <Link href="/dashboard/configuracoes" onClick={() => setMobileMenuOpen(false)}>
                     <Button
@@ -855,32 +746,40 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Cards de Resumo - Primeira Linha */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          {/* Cards de Resumo */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
             {/* Saldo Atual */}
-            <Card 
-              className="h-full cursor-pointer hover:shadow-md transition-shadow"
-              onClick={() => abrirSidebar('saldo-atual')}
-            >
+            <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Saldo Atual</CardTitle>
                 <WalletIcon className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className={`text-2xl font-bold ${saldoAtual >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {formatarMoeda(saldoAtual)}
-                </div>
+                <div className="text-2xl font-bold">{formatarMoeda(saldoAtual)}</div>
                 <p className="text-xs text-muted-foreground">
                   Balanço geral
                 </p>
               </CardContent>
             </Card>
 
+            {/* Despesas */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Despesas</CardTitle>
+                <ArrowDownIcon className="h-4 w-4 text-red-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-red-600">
+                  {formatarMoeda(totalSaidas)}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {transacoes.filter(t => t.tipo === 'despesa').length} registros
+                </p>
+              </CardContent>
+            </Card>
+
             {/* Entradas */}
-            <Card 
-              className="h-full cursor-pointer hover:shadow-md transition-shadow"
-              onClick={() => abrirSidebar('entradas')}
-            >
+            <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Entradas</CardTitle>
                 <ArrowUpIcon className="h-4 w-4 text-green-600" />
@@ -895,52 +794,8 @@ export default function HomePage() {
               </CardContent>
             </Card>
 
-            {/* Despesas */}
-            <Card 
-              className="h-full cursor-pointer hover:shadow-md transition-shadow"
-              onClick={() => abrirSidebar('despesas')}
-            >
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Despesas</CardTitle>
-                <ArrowDownIcon className="h-4 w-4 text-red-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-red-600">
-                  {formatarMoeda(totalDespesas)}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {transacoes.filter(t => t.tipo === 'despesa').length} registros
-                </p>
-              </CardContent>
-            </Card>
-
-            {/* Investimentos */}
-            <Card 
-              className="h-full cursor-pointer hover:shadow-md transition-shadow"
-              onClick={() => abrirSidebar('investimentos')}
-            >
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Investimentos</CardTitle>
-                <TrendingUpIcon className="h-4 w-4 text-purple-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-purple-600">
-                  {formatarMoeda(totalInvestimentos)}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {investimentos.length > 0 
-                    ? `${investimentos.length} investimentos` 
-                    : `${transacoes.filter(t => t.tipo === 'investimento').length} transações`
-                  }
-                </p>
-              </CardContent>
-            </Card>
-
             {/* Transações */}
-            <Card 
-              className="h-full cursor-pointer hover:shadow-md transition-shadow"
-              onClick={() => abrirSidebar('transacoes')}
-            >
+            <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Transações</CardTitle>
                 <FileTextIcon className="h-4 w-4 text-blue-600" />
@@ -955,36 +810,67 @@ export default function HomePage() {
               </CardContent>
             </Card>
 
-            {/* Contas a Pagar */}
-            <Card 
-              className="cursor-pointer hover:shadow-md transition-shadow h-full"
-              onClick={() => abrirSidebar('contas-a-pagar')}
-            >
+            {/* Investimentos */}
+            <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Contas a Pagar</CardTitle>
-                <AlertTriangleIcon className="h-4 w-4 text-orange-600" />
+                <CardTitle className="text-sm font-medium">Investimentos</CardTitle>
+                <TrendingUpIcon className="h-4 w-4 text-purple-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-orange-600">
+                <div className="text-2xl font-bold text-purple-600">
+                  {formatarMoeda(totalInvestimentos)}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {transacoes.filter(t => t.tipo === 'investimento').length} transações
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Contas a Pagar */}
+            <Link href="/dashboard/contas-a-pagar">
+              <Card className="cursor-pointer hover:shadow-md transition-shadow">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Contas a Pagar</CardTitle>
+                  <AlertTriangleIcon className="h-4 w-4 text-orange-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-orange-600">
+                    {formatarMoeda(contasAPagar.filter(c => !c.quitado).reduce((total, conta) => {
+                      const parcelasRestantes = conta.qtd_parcelas - conta.parcela_atual + 1
+                      return total + (conta.valor_parcela * parcelasRestantes)
+                    }, 0))}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {contasAPagar.filter(c => !c.quitado).length} pendentes
+                  </p>
+                </CardContent>
+              </Card>
+            </Link>
+          </div>
+
+          {/* Segunda linha de cards - Parcelas/Cotas */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Contas a Pagar */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Contas a Pagar</CardTitle>
+                <ClockIcon className="h-4 w-4 text-indigo-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-indigo-600">
                   {formatarMoeda(contasAPagar.filter(c => !c.quitado).reduce((total, conta) => {
                     const parcelasRestantes = conta.qtd_parcelas - conta.parcela_atual + 1
                     return total + (conta.valor_parcela * parcelasRestantes)
                   }, 0))}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {contasAPagar.filter(c => !c.quitado).length} pendentes
+                  {contasAPagar.filter(c => !c.quitado).length} contas em aberto
                 </p>
               </CardContent>
             </Card>
-          </div>
 
-          {/* Cards de Detalhes - Segunda Linha */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            {/* Contas Vencidas */}
-            <Card 
-              className="h-full cursor-pointer hover:shadow-md transition-shadow"
-              onClick={() => abrirSidebar('contas-vencidas')}
-            >
+            {/* Vencidas */}
+            <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Vencidas</CardTitle>
                 <AlertTriangleIcon className="h-4 w-4 text-red-600" />
@@ -998,16 +884,13 @@ export default function HomePage() {
                   }).length}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Contas em atraso
+                  Contas vencidas
                 </p>
               </CardContent>
             </Card>
 
             {/* Próximos Vencimentos */}
-            <Card 
-              className="h-full cursor-pointer hover:shadow-md transition-shadow"
-              onClick={() => abrirSidebar('proximos-vencimentos')}
-            >
+            <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Próximos 7 dias</CardTitle>
                 <CalendarIcon className="h-4 w-4 text-yellow-600" />
@@ -1030,78 +913,22 @@ export default function HomePage() {
               </CardContent>
             </Card>
 
-            {/* Contas Quitadas */}
-            <Card 
-              className="h-full cursor-pointer hover:shadow-md transition-shadow"
-              onClick={() => abrirSidebar('contas-quitadas')}
-            >
+            {/* Total Pago */}
+            <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Quitadas</CardTitle>
+                <CardTitle className="text-sm font-medium">Total Pago</CardTitle>
                 <CreditCardIcon className="h-4 w-4 text-green-600" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-green-600">
-                  {contasAPagar.filter(c => c.quitado).length}
+                  {formatarMoeda(
+                    contasAPagar.filter(c => c.quitado).reduce((total, conta) => {
+                      return total + (conta.valor_parcela * conta.parcela_atual)
+                    }, 0)
+                  )}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Contas pagas
-                </p>
-              </CardContent>
-            </Card>
-
-            {/* Metas */}
-            <Card 
-              className="h-full cursor-pointer hover:shadow-md transition-shadow"
-              onClick={() => abrirSidebar('metas')}
-            >
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Metas</CardTitle>
-                <Target className="h-4 w-4 text-indigo-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-indigo-600">
-                  {metas.length}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Objetivos ativos
-                </p>
-              </CardContent>
-            </Card>
-
-            {/* Categorias */}
-            <Card 
-              className="h-full cursor-pointer hover:shadow-md transition-shadow"
-              onClick={() => abrirSidebar('categorias')}
-            >
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Categorias</CardTitle>
-                <Building className="h-4 w-4 text-gray-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-gray-600">
-                  {categorias.length > 0 ? categorias.length : 8}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Tipos cadastrados
-                </p>
-              </CardContent>
-            </Card>
-
-            {/* Contas Bancárias */}
-            <Card 
-              className="h-full cursor-pointer hover:shadow-md transition-shadow"
-              onClick={() => abrirSidebar('contas-bancarias')}
-            >
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Contas</CardTitle>
-                <Building className="h-4 w-4 text-blue-700" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-blue-700">
-                  {contasBancarias.length}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Contas bancárias
+                  Este mês
                 </p>
               </CardContent>
             </Card>
@@ -1297,7 +1124,7 @@ export default function HomePage() {
                           </div>
                           <div className="flex justify-between text-xs text-muted-foreground">
                             <span>{progresso.toFixed(1)}% concluído</span>
-                            <span>Prazo: {meta.prazo ? new Date(meta.prazo).toLocaleDateString('pt-BR') : 'Não definido'}</span>
+                            <span>Prazo: {new Date(meta.prazo).toLocaleDateString('pt-BR')}</span>
                           </div>
                         </div>
                       )
@@ -1312,11 +1139,7 @@ export default function HomePage() {
 
       {/* Modal de Transação */}
       <Dialog open={modalTransacaoAberto} onOpenChange={setModalTransacaoAberto}>
-        <DialogContent 
-          className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto"
-          onOpenAutoFocus={(e) => e.preventDefault()}
-          onCloseAutoFocus={(e) => e.preventDefault()}
-        >
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {transacaoEditando ? 'Editar Transação' : 'Nova Transação'}
@@ -1736,946 +1559,6 @@ export default function HomePage() {
                     ? 'Atualizar' 
                     : 'Adicionar'
                 }
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Sidebar de Detalhes */}
-      <Sheet open={sidebarAberta} onOpenChange={setSidebarAberta}>
-        <SheetContent 
-          side="right" 
-          className="w-[400px] sm:w-[500px] overflow-y-auto"
-          onOpenAutoFocus={(e) => e.preventDefault()}
-          onCloseAutoFocus={(e) => e.preventDefault()}
-        >
-          <SheetHeader>
-            <SheetTitle>
-              {tipoSidebarAtivo === 'saldo-atual' && 'Detalhes do Saldo Atual'}
-              {tipoSidebarAtivo === 'entradas' && 'Detalhes das Entradas'}
-              {tipoSidebarAtivo === 'despesas' && 'Detalhes das Despesas'}
-              {tipoSidebarAtivo === 'investimentos' && 'Detalhes dos Investimentos'}
-              {tipoSidebarAtivo === 'transacoes' && 'Todas as Transações'}
-              {tipoSidebarAtivo === 'contas-a-pagar' && 'Contas a Pagar'}
-              {tipoSidebarAtivo === 'contas-vencidas' && 'Contas Vencidas'}
-              {tipoSidebarAtivo === 'proximos-vencimentos' && 'Próximos Vencimentos'}
-              {tipoSidebarAtivo === 'contas-quitadas' && 'Contas Quitadas'}
-              {tipoSidebarAtivo === 'metas' && 'Metas Financeiras'}
-              {tipoSidebarAtivo === 'categorias' && 'Categorias'}
-              {tipoSidebarAtivo === 'contas-bancarias' && 'Contas Bancárias'}
-            </SheetTitle>
-            <SheetDescription>
-              {tipoSidebarAtivo === 'saldo-atual' && 'Visão detalhada do seu balanço financeiro atual'}
-              {tipoSidebarAtivo === 'entradas' && 'Todas as suas receitas e ganhos registrados'}
-              {tipoSidebarAtivo === 'despesas' && 'Todas as suas despesas e gastos registrados'}
-              {tipoSidebarAtivo === 'investimentos' && 'Portfolio completo dos seus investimentos'}
-              {tipoSidebarAtivo === 'transacoes' && 'Histórico completo de todas as movimentações'}
-              {tipoSidebarAtivo === 'contas-a-pagar' && 'Gestão completa das suas contas pendentes'}
-              {tipoSidebarAtivo === 'contas-vencidas' && 'Contas que já passaram do vencimento'}
-              {tipoSidebarAtivo === 'proximos-vencimentos' && 'Contas que vencem nos próximos 7 dias'}
-              {tipoSidebarAtivo === 'contas-quitadas' && 'Histórico de contas já pagas'}
-              {tipoSidebarAtivo === 'metas' && 'Acompanhe o progresso dos seus objetivos financeiros'}
-              {tipoSidebarAtivo === 'categorias' && 'Gestão das categorias de transações'}
-              {tipoSidebarAtivo === 'contas-bancarias' && 'Gerenciamento das suas contas bancárias'}
-            </SheetDescription>
-          </SheetHeader>
-
-          <div className="mt-6 space-y-4">
-            {/* Conteúdo dinâmico baseado no tipo selecionado */}
-            
-            {/* Saldo Atual */}
-            {tipoSidebarAtivo === 'saldo-atual' && (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm text-green-600">Total de Entradas</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-2xl font-bold text-green-600">{formatarMoeda(totalEntradas)}</p>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm text-red-600">Total de Despesas</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-2xl font-bold text-red-600">{formatarMoeda(totalDespesas)}</p>
-                    </CardContent>
-                  </Card>
-                </div>
-                
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Resumo por Conta</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {contasBancarias.map(conta => {
-                        const saldoConta = calcularSaldoAtual(conta.id, conta.saldo_inicial || 0, transacoes)
-                        return (
-                          <div key={conta.id} className="flex justify-between items-center p-3 border rounded">
-                            <div>
-                              <p className="font-medium">{conta.nome_conta}</p>
-                              <p className="text-sm text-muted-foreground">{conta.tipo_conta}</p>
-                            </div>
-                            <p className={`font-bold ${saldoConta >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                              {formatarMoeda(saldoConta)}
-                            </p>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            )}
-
-            {/* Entradas */}
-            {tipoSidebarAtivo === 'entradas' && (
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-lg font-semibold">Receitas Registradas</h3>
-                  <Button onClick={() => abrirModalTransacao()}>
-                    <PlusIcon className="h-4 w-4 mr-2" />
-                    Adicionar
-                  </Button>
-                </div>
-                
-                <div className="space-y-2">
-                  {transacoes
-                    .filter(t => t.tipo === 'entrada')
-                    .sort((a, b) => new Date(b.data_transacao).getTime() - new Date(a.data_transacao).getTime())
-                    .map(transacao => (
-                      <Card key={transacao.id} className="p-3">
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <p className="font-medium">{transacao.descricao}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {categoriasParaUsar.find(c => c.id === transacao.categoria_id)?.nome}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {new Date(transacao.data_transacao).toLocaleDateString('pt-BR')}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-bold text-green-600">{formatarMoeda(transacao.valor)}</p>
-                            <div className="flex gap-1 mt-2">
-                              <Button size="sm" variant="outline" onClick={() => abrirModalTransacao(transacao)}>
-                                <EditIcon className="h-3 w-3" />
-                              </Button>
-                              <Button size="sm" variant="outline" onClick={() => handleDeleteTransacao(transacao.id)}>
-                                <TrashIcon className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      </Card>
-                    ))}
-                </div>
-              </div>
-            )}
-
-            {/* Despesas */}
-            {tipoSidebarAtivo === 'despesas' && (
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-lg font-semibold">Despesas Registradas</h3>
-                  <Button onClick={() => abrirModalTransacao()}>
-                    <PlusIcon className="h-4 w-4 mr-2" />
-                    Adicionar
-                  </Button>
-                </div>
-                
-                <div className="space-y-2">
-                  {transacoes
-                    .filter(t => t.tipo === 'despesa')
-                    .sort((a, b) => new Date(b.data_transacao).getTime() - new Date(a.data_transacao).getTime())
-                    .map(transacao => (
-                      <Card key={transacao.id} className="p-3">
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <p className="font-medium">{transacao.descricao}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {categoriasParaUsar.find(c => c.id === transacao.categoria_id)?.nome}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {new Date(transacao.data_transacao).toLocaleDateString('pt-BR')}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-bold text-red-600">{formatarMoeda(Math.abs(transacao.valor))}</p>
-                            <div className="flex gap-1 mt-2">
-                              <Button size="sm" variant="outline" onClick={() => abrirModalTransacao(transacao)}>
-                                <EditIcon className="h-3 w-3" />
-                              </Button>
-                              <Button size="sm" variant="outline" onClick={() => handleDeleteTransacao(transacao.id)}>
-                                <TrashIcon className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      </Card>
-                    ))}
-                </div>
-              </div>
-            )}
-
-            {/* Investimentos */}
-            {tipoSidebarAtivo === 'investimentos' && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Portfolio de Investimentos</h3>
-                
-                {investimentos.length > 0 ? (
-                  <div className="space-y-3">
-                    {investimentos.map((investimento, index) => (
-                      <Card key={`${investimento.usuario_id}-${index}`} className="p-4">
-                        <div className="space-y-2">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <p className="font-medium">{investimento.nome_investimento}</p>
-                              <p className="text-sm text-muted-foreground">{investimento.tipo}</p>
-                            </div>
-                            <p className="font-bold text-purple-600">
-                              {formatarMoeda(investimento.valor_investimento)}
-                            </p>
-                          </div>
-                          <div className="grid grid-cols-2 gap-4 text-sm">
-                            <div>
-                              <p className="text-muted-foreground">Rendimento</p>
-                              <p className="font-medium text-green-600">{investimento.rendimento}%</p>
-                            </div>
-                            <div>
-                              <p className="text-muted-foreground">Data Aplicação</p>
-                              <p className="font-medium">
-                                {new Date(investimento.data_aplicacao).toLocaleDateString('pt-BR')}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      </Card>
-                    ))}
-                  </div>
-                ) : (
-                  <Card className="p-8 text-center">
-                    <p className="text-muted-foreground">Nenhum investimento encontrado</p>
-                    <p className="text-sm text-muted-foreground mt-2">
-                      Adicione investimentos ao banco de dados para visualizá-los aqui
-                    </p>
-                  </Card>
-                )}
-              </div>
-            )}
-
-            {/* Metas */}
-            {tipoSidebarAtivo === 'metas' && (
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-lg font-semibold">Metas Financeiras</h3>
-                  <Button 
-                    onClick={() => abrirModalMeta()}
-                    size="sm"
-                    className="flex items-center gap-2"
-                  >
-                    <PlusIcon className="h-4 w-4" />
-                    Nova Meta
-                  </Button>
-                </div>
-
-                {/* Estatísticas das Metas */}
-                <div className="grid grid-cols-2 gap-3">
-                  <Card className="p-3">
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-green-600">
-                        {formatarMoeda(getTotalEconomizado())}
-                      </p>
-                      <p className="text-xs text-muted-foreground">Total Economizado</p>
-                    </div>
-                  </Card>
-                  <Card className="p-3">
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-blue-600">
-                        {formatarMoeda(getTotalObjetivo())}
-                      </p>
-                      <p className="text-xs text-muted-foreground">Objetivo Total</p>
-                    </div>
-                  </Card>
-                </div>
-
-                {metas.length > 0 ? (
-                  <div className="space-y-4">
-                    {metas.map(meta => {
-                      const progresso = getProgressoMeta(meta)
-                      const diasRestantes = meta.prazo 
-                        ? Math.ceil((new Date(meta.prazo).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
-                        : null
-
-                      return (
-                        <Card key={meta.id} className="p-4">
-                          <div className="space-y-3">
-                            <div className="flex justify-between items-start">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <p className="font-medium">{meta.titulo}</p>
-                                  <Badge 
-                                    variant={meta.status === 'ativa' ? 'default' : 
-                                           meta.status === 'concluida' ? 'secondary' : 
-                                           meta.status === 'pausada' ? 'outline' : 'destructive'}
-                                    className={`text-xs ${
-                                      meta.status === 'ativa' ? 'bg-blue-500' :
-                                      meta.status === 'concluida' ? 'bg-green-500' :
-                                      meta.status === 'pausada' ? 'bg-yellow-500' :
-                                      'bg-red-500'
-                                    } text-white`}
-                                  >
-                                    {meta.status === 'ativa' ? 'Ativa' :
-                                     meta.status === 'concluida' ? 'Concluída' :
-                                     meta.status === 'pausada' ? 'Pausada' : 'Cancelada'}
-                                  </Badge>
-                                </div>
-                                <p className="text-sm text-muted-foreground">{meta.categoria}</p>
-                                {meta.descricao && (
-                                  <p className="text-xs text-muted-foreground mt-1">{meta.descricao}</p>
-                                )}
-                              </div>
-                              <div className="flex gap-1 ml-2">
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm"
-                                  onClick={() => abrirModalUpdateValue(meta)}
-                                  className="p-1 h-7 w-7"
-                                >
-                                  <DollarSign className="h-3 w-3" />
-                                </Button>
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm"
-                                  onClick={() => abrirModalMeta(meta)}
-                                  className="p-1 h-7 w-7"
-                                >
-                                  <EditIcon className="h-3 w-3" />
-                                </Button>
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm"
-                                  onClick={() => handleDeleteMeta(meta.id)}
-                                  className="p-1 h-7 w-7 text-red-600 hover:text-red-700"
-                                >
-                                  <TrashIcon className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            </div>
-                            
-                            <div className="space-y-2">
-                              <div className="flex justify-between text-sm">
-                                <span>Progresso</span>
-                                <span className="font-medium">{progresso.toFixed(1)}%</span>
-                              </div>
-                              <Progress value={progresso} className="h-2" />
-                              <div className="flex justify-between text-sm text-muted-foreground">
-                                <span>{formatarMoeda(meta.valor_atual)}</span>
-                                <span>{formatarMoeda(meta.valor_meta)}</span>
-                              </div>
-                            </div>
-
-                            {meta.prazo && (
-                              <div className="text-sm text-muted-foreground">
-                                <span>Prazo: {new Date(meta.prazo).toLocaleDateString('pt-BR')}</span>
-                                {diasRestantes !== null && (
-                                  <span className={`ml-2 ${diasRestantes <= 30 ? 'text-orange-600' : ''}`}>
-                                    ({diasRestantes > 0 ? `${diasRestantes} dias restantes` : 'Vencida'})
-                                  </span>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </Card>
-                      )
-                    })}
-
-                    {/* Metas próximas ao vencimento */}
-                    {getMetasProximasVencimento(30).length > 0 && (
-                      <div className="mt-6">
-                        <h4 className="text-md font-semibold text-orange-600 mb-3">
-                          ⚠️ Próximas ao Vencimento (30 dias)
-                        </h4>
-                        <div className="space-y-2">
-                          {getMetasProximasVencimento(30).map(meta => (
-                            <div key={`proximo-${meta.id}`} className="text-sm p-2 bg-orange-50 dark:bg-orange-900/20 rounded border border-orange-200 dark:border-orange-700">
-                              <div className="flex justify-between">
-                                <span className="font-medium">{meta.titulo}</span>
-                                <span className="text-orange-600">
-                                  {meta.prazo ? Math.ceil((new Date(meta.prazo).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : 0} dias
-                                </span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <Card className="p-8 text-center">
-                    <Target className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                    <p className="text-muted-foreground mb-2">Nenhuma meta encontrada</p>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Comece criando sua primeira meta financeira
-                    </p>
-                    <Button onClick={() => abrirModalMeta()}>
-                      <PlusIcon className="h-4 w-4 mr-2" />
-                      Criar Meta
-                    </Button>
-                  </Card>
-                )}
-              </div>
-            )}
-
-            {/* Contas a Pagar */}
-            {tipoSidebarAtivo === 'contas-a-pagar' && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Contas Pendentes</h3>
-                
-                <div className="space-y-3">
-                  {contasAPagar
-                    .filter(c => !c.quitado)
-                    .sort((a, b) => new Date(a.data_vencimento).getTime() - new Date(b.data_vencimento).getTime())
-                    .map(conta => {
-                      const hoje = new Date()
-                      const vencimento = new Date(conta.data_vencimento)
-                      const isVencida = vencimento < hoje
-                      const diasRestantes = Math.ceil((vencimento.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24))
-                      
-                      return (
-                        <Card key={conta.id} className={`p-4 ${isVencida ? 'border-red-200 bg-red-50 dark:bg-red-900/20' : ''}`}>
-                          <div className="space-y-2">
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <p className="font-medium">{conta.descricao}</p>
-                                <p className="text-sm text-muted-foreground">
-                                  Parcela {conta.parcela_atual} de {conta.qtd_parcelas}
-                                </p>
-                              </div>
-                              <div className="text-right">
-                                <p className="font-bold text-orange-600">
-                                  {formatarMoeda(conta.valor_parcela)}
-                                </p>
-                                {isVencida ? (
-                                  <Badge variant="destructive" className="text-xs">
-                                    Vencida
-                                  </Badge>
-                                ) : diasRestantes <= 7 ? (
-                                  <Badge variant="secondary" className="text-xs">
-                                    {diasRestantes} dias
-                                  </Badge>
-                                ) : null}
-                              </div>
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              Vencimento: {vencimento.toLocaleDateString('pt-BR')}
-                            </div>
-                          </div>
-                        </Card>
-                      )
-                    })}
-                </div>
-              </div>
-            )}
-
-            {/* Adicionar outros tipos conforme necessário */}
-            {tipoSidebarAtivo === 'transacoes' && (
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-lg font-semibold">Todas as Transações</h3>
-                  <Button onClick={() => abrirModalTransacao()}>
-                    <PlusIcon className="h-4 w-4 mr-2" />
-                    Adicionar
-                  </Button>
-                </div>
-                
-                <div className="space-y-2">
-                  {transacoes
-                    .sort((a, b) => new Date(b.data_transacao).getTime() - new Date(a.data_transacao).getTime())
-                    .map(transacao => (
-                      <Card key={transacao.id} className="p-3">
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <p className="font-medium">{transacao.descricao}</p>
-                            <div className="flex items-center gap-2 mt-1">
-                              <Badge variant={
-                                transacao.tipo === "entrada" ? "default" :
-                                transacao.tipo === "despesa" ? "destructive" :
-                                "secondary"
-                              } className="text-xs">
-                                {transacao.tipo}
-                              </Badge>
-                              <span className="text-sm text-muted-foreground">
-                                {categoriasParaUsar.find(c => c.id === transacao.categoria_id)?.nome}
-                              </span>
-                            </div>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {new Date(transacao.data_transacao).toLocaleDateString('pt-BR')}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className={`font-bold ${
-                              transacao.valor > 0 ? "text-green-600" : "text-red-600"
-                            }`}>
-                              {formatarMoeda(transacao.valor)}
-                            </p>
-                            <div className="flex gap-1 mt-2">
-                              <Button size="sm" variant="outline" onClick={() => abrirModalTransacao(transacao)}>
-                                <EditIcon className="h-3 w-3" />
-                              </Button>
-                              <Button size="sm" variant="outline" onClick={() => handleDeleteTransacao(transacao.id)}>
-                                <TrashIcon className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      </Card>
-                    ))}
-                </div>
-              </div>
-            )}
-
-            {/* Contas Vencidas */}
-            {tipoSidebarAtivo === 'contas-vencidas' && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-red-600">Contas em Atraso</h3>
-                
-                <div className="space-y-3">
-                  {contasAPagar
-                    .filter(c => {
-                      const hoje = new Date()
-                      const vencimento = new Date(c.data_vencimento)
-                      return !c.quitado && vencimento < hoje
-                    })
-                    .sort((a, b) => new Date(a.data_vencimento).getTime() - new Date(b.data_vencimento).getTime())
-                    .map(conta => {
-                      const hoje = new Date()
-                      const vencimento = new Date(conta.data_vencimento)
-                      const diasAtraso = Math.ceil((hoje.getTime() - vencimento.getTime()) / (1000 * 60 * 60 * 24))
-                      
-                      return (
-                        <Card key={conta.id} className="p-4 border-red-200 bg-red-50 dark:bg-red-900/20">
-                          <div className="space-y-2">
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <p className="font-medium">{conta.descricao}</p>
-                                <p className="text-sm text-muted-foreground">
-                                  Parcela {conta.parcela_atual} de {conta.qtd_parcelas}
-                                </p>
-                              </div>
-                              <div className="text-right">
-                                <p className="font-bold text-red-600">
-                                  {formatarMoeda(conta.valor_parcela)}
-                                </p>
-                                <Badge variant="destructive" className="text-xs">
-                                  {diasAtraso} dias atraso
-                                </Badge>
-                              </div>
-                            </div>
-                            <div className="text-sm text-red-600">
-                              Venceu em: {vencimento.toLocaleDateString('pt-BR')}
-                            </div>
-                          </div>
-                        </Card>
-                      )
-                    })}
-                </div>
-                
-                {contasAPagar.filter(c => {
-                  const hoje = new Date()
-                  const vencimento = new Date(c.data_vencimento)
-                  return !c.quitado && vencimento < hoje
-                }).length === 0 && (
-                  <Card className="p-8 text-center">
-                    <p className="text-green-600 font-medium">🎉 Nenhuma conta vencida!</p>
-                    <p className="text-sm text-muted-foreground mt-2">
-                      Suas contas estão em dia
-                    </p>
-                  </Card>
-                )}
-              </div>
-            )}
-
-            {/* Próximos Vencimentos */}
-            {tipoSidebarAtivo === 'proximos-vencimentos' && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-yellow-600">Próximos 7 Dias</h3>
-                
-                <div className="space-y-3">
-                  {(() => {
-                    const hoje = new Date()
-                    const proximos7Dias = new Date(hoje.getTime() + 7 * 24 * 60 * 60 * 1000)
-                    
-                    return contasAPagar
-                      .filter(c => {
-                        const vencimento = new Date(c.data_vencimento)
-                        return vencimento >= hoje && vencimento <= proximos7Dias && !c.quitado
-                      })
-                      .sort((a, b) => new Date(a.data_vencimento).getTime() - new Date(b.data_vencimento).getTime())
-                      .map(conta => {
-                        const hoje = new Date()
-                        const vencimento = new Date(conta.data_vencimento)
-                        const diasRestantes = Math.ceil((vencimento.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24))
-                        
-                        return (
-                          <Card key={conta.id} className="p-4 border-yellow-200 bg-yellow-50 dark:bg-yellow-900/20">
-                            <div className="space-y-2">
-                              <div className="flex justify-between items-start">
-                                <div>
-                                  <p className="font-medium">{conta.descricao}</p>
-                                  <p className="text-sm text-muted-foreground">
-                                    Parcela {conta.parcela_atual} de {conta.qtd_parcelas}
-                                  </p>
-                                </div>
-                                <div className="text-right">
-                                  <p className="font-bold text-orange-600">
-                                    {formatarMoeda(conta.valor_parcela)}
-                                  </p>
-                                  <Badge variant="secondary" className="text-xs">
-                                    {diasRestantes === 0 ? 'Hoje' : `${diasRestantes} dias`}
-                                  </Badge>
-                                </div>
-                              </div>
-                              <div className="text-sm text-yellow-700 dark:text-yellow-300">
-                                Vence em: {vencimento.toLocaleDateString('pt-BR')}
-                              </div>
-                            </div>
-                          </Card>
-                        )
-                      })
-                  })()}
-                </div>
-              </div>
-            )}
-
-            {/* Contas Quitadas */}
-            {tipoSidebarAtivo === 'contas-quitadas' && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-green-600">Contas Pagas</h3>
-                
-                <div className="space-y-3">
-                  {contasAPagar
-                    .filter(c => c.quitado)
-                    .sort((a, b) => new Date(b.data_vencimento).getTime() - new Date(a.data_vencimento).getTime())
-                    .map(conta => (
-                      <Card key={conta.id} className="p-4 border-green-200 bg-green-50 dark:bg-green-900/20">
-                        <div className="space-y-2">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <p className="font-medium">{conta.descricao}</p>
-                              <p className="text-sm text-muted-foreground">
-                                Parcela {conta.parcela_atual} de {conta.qtd_parcelas}
-                              </p>
-                            </div>
-                            <div className="text-right">
-                              <p className="font-bold text-green-600">
-                                {formatarMoeda(conta.valor_parcela)}
-                              </p>
-                              <Badge variant="default" className="text-xs bg-green-600">
-                                Quitada
-                              </Badge>
-                            </div>
-                          </div>
-                          <div className="text-sm text-green-700 dark:text-green-300">
-                            Vencimento: {new Date(conta.data_vencimento).toLocaleDateString('pt-BR')}
-                          </div>
-                        </div>
-                      </Card>
-                    ))}
-                </div>
-              </div>
-            )}
-
-            {/* Categorias */}
-            {tipoSidebarAtivo === 'categorias' && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Gestão de Categorias</h3>
-                
-                <div className="grid grid-cols-1 gap-3">
-                  {categoriasParaUsar.map(categoria => {
-                    const transacoesCategoria = transacoes.filter(t => t.categoria_id === categoria.id)
-                    const totalTransacoes = transacoesCategoria.length
-                    const valorTotal = transacoesCategoria.reduce((sum, t) => sum + Math.abs(t.valor), 0)
-                    
-                    return (
-                      <Card key={categoria.id} className="p-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div 
-                              className="w-4 h-4 rounded-full flex-shrink-0" 
-                              style={{ backgroundColor: categoria.cor_padrao }}
-                            />
-                            <div>
-                              <p className="font-medium">{categoria.nome}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {totalTransacoes} transações
-                              </p>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-bold">{formatarMoeda(valorTotal)}</p>
-                            <p className="text-xs text-muted-foreground">
-                              Total movimentado
-                            </p>
-                          </div>
-                        </div>
-                      </Card>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Contas Bancárias */}
-            {tipoSidebarAtivo === 'contas-bancarias' && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Contas Bancárias</h3>
-                
-                <div className="space-y-3">
-                  {contasBancarias.map(conta => {
-                    const saldoAtual = calcularSaldoAtual(conta.id, conta.saldo_inicial || 0, transacoes)
-                    const transacoesConta = transacoes.filter(t => 
-                      t.conta_bancaria_id === conta.id || 
-                      t.conta_origem_id === conta.id || 
-                      t.conta_destino_id === conta.id
-                    )
-                    
-                    return (
-                      <Card key={conta.id} className="p-4">
-                        <div className="space-y-3">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <p className="font-medium">{conta.nome_conta}</p>
-                              <p className="text-sm text-muted-foreground capitalize">
-                                {conta.tipo_conta}
-                              </p>
-                            </div>
-                            <div className="text-right">
-                              <p className={`font-bold text-lg ${saldoAtual >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                {formatarMoeda(saldoAtual)}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                Saldo atual
-                              </p>
-                            </div>
-                          </div>
-                          
-                          <div className="grid grid-cols-2 gap-4 text-sm">
-                            <div>
-                              <p className="text-muted-foreground">Saldo Inicial</p>
-                              <p className="font-medium">{formatarMoeda(conta.saldo_inicial || 0)}</p>
-                            </div>
-                            <div>
-                              <p className="text-muted-foreground">Transações</p>
-                              <p className="font-medium">{transacoesConta.length}</p>
-                            </div>
-                          </div>
-                        </div>
-                      </Card>
-                    )
-                  })}
-                </div>
-                
-                {contasBancarias.length === 0 && (
-                  <Card className="p-8 text-center">
-                    <p className="text-muted-foreground">Nenhuma conta bancária encontrada</p>
-                    <p className="text-sm text-muted-foreground mt-2">
-                      Adicione contas bancárias ao banco de dados para visualizá-las aqui
-                    </p>
-                  </Card>
-                )}
-              </div>
-            )}
-
-          </div>
-        </SheetContent>
-      </Sheet>
-
-      {/* Modal para adicionar/editar meta */}
-      <Dialog open={modalMetaAberto} onOpenChange={setModalMetaAberto}>
-        <DialogContent 
-          className="max-w-md max-h-[85vh] overflow-hidden flex flex-col"
-          onOpenAutoFocus={(e) => e.preventDefault()}
-          onCloseAutoFocus={(e) => e.preventDefault()}
-        >
-          <DialogHeader className="flex-shrink-0">
-            <DialogTitle>{metaEditando ? 'Editar Meta' : 'Nova Meta'}</DialogTitle>
-            <DialogDescription>
-              {metaEditando ? 'Atualize as informações da sua meta' : 'Crie uma nova meta financeira'}
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="flex-1 overflow-y-auto pr-2 -mr-2">
-            <form onSubmit={handleSubmitMeta} className="space-y-4 pb-4">
-            <div>
-              <Label htmlFor="titulo">Título *</Label>
-              <Input
-                id="titulo"
-                name="titulo"
-                value={formMeta.titulo}
-                onChange={handleInputMetaChange}
-                placeholder="Ex: Viagem para Europa"
-                required
-                disabled={isLoading}
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="descricao">Descrição</Label>
-              <Textarea
-                id="descricao"
-                name="descricao"
-                value={formMeta.descricao}
-                onChange={handleInputMetaChange}
-                placeholder="Descreva sua meta..."
-                rows={3}
-                disabled={isLoading}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="valor_meta">Valor Objetivo *</Label>
-                <Input
-                  id="valor_meta"
-                  name="valor_meta"
-                  type="number"
-                  step="0.01"
-                  value={formMeta.valor_meta}
-                  onChange={handleInputMetaChange}
-                  placeholder="0,00"
-                  required
-                  disabled={isLoading}
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="valor_atual">Valor Atual</Label>
-                <Input
-                  id="valor_atual"
-                  name="valor_atual"
-                  type="number"
-                  step="0.01"
-                  value={formMeta.valor_atual}
-                  onChange={handleInputMetaChange}
-                  placeholder="0,00"
-                  disabled={isLoading}
-                />
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="categoria">Categoria *</Label>
-              <Select value={formMeta.categoria} onValueChange={(value) => handleSelectMetaChange('categoria', value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione uma categoria" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Emergência">Emergência</SelectItem>
-                  <SelectItem value="Viagem">Viagem</SelectItem>
-                  <SelectItem value="Casa Própria">Casa Própria</SelectItem>
-                  <SelectItem value="Carro">Carro</SelectItem>
-                  <SelectItem value="Educação">Educação</SelectItem>
-                  <SelectItem value="Aposentadoria">Aposentadoria</SelectItem>
-                  <SelectItem value="Investimento">Investimento</SelectItem>
-                  <SelectItem value="Outros">Outros</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label htmlFor="prazo">Prazo</Label>
-              <Input
-                id="prazo"
-                name="prazo"
-                type="date"
-                value={formMeta.prazo}
-                onChange={handleInputMetaChange}
-                disabled={isLoading}
-              />
-            </div>
-
-            {metaEditando && (
-              <div>
-                <Label htmlFor="status">Status</Label>
-                <Select value={formMeta.status} onValueChange={(value: Meta['status']) => handleSelectMetaChange('status', value)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ativa">Ativa</SelectItem>
-                    <SelectItem value="concluida">Concluída</SelectItem>
-                    <SelectItem value="pausada">Pausada</SelectItem>
-                    <SelectItem value="cancelada">Cancelada</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-            </form>
-          </div>
-
-          <div className="flex gap-2 pt-4 border-t mt-4 flex-shrink-0">
-            <Button variant="outline" onClick={fecharModalMeta} className="flex-1" disabled={isLoading}>
-              Cancelar
-            </Button>
-            <Button onClick={handleSubmitMeta} className="flex-1" disabled={isLoading}>
-              {isLoading ? 'Salvando...' : metaEditando ? 'Salvar' : 'Criar Meta'}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Modal para atualizar valor da meta */}
-      <Dialog open={modalUpdateValueAberto} onOpenChange={setModalUpdateValueAberto}>
-        <DialogContent 
-          className="max-w-sm"
-          onOpenAutoFocus={(e) => e.preventDefault()}
-          onCloseAutoFocus={(e) => e.preventDefault()}
-        >
-          <DialogHeader>
-            <DialogTitle>Atualizar Progresso</DialogTitle>
-            <DialogDescription>
-              Atualize o valor atual da meta "{metaParaAtualizar?.titulo}"
-            </DialogDescription>
-          </DialogHeader>
-          
-          <form onSubmit={handleUpdateValueMeta} className="space-y-4">
-            <div>
-              <Label htmlFor="novo-valor">Novo Valor</Label>
-              <Input
-                id="novo-valor"
-                type="number"
-                step="0.01"
-                value={novoValorMeta}
-                onChange={(e) => setNovoValorMeta(e.target.value)}
-                placeholder="0,00"
-                required
-                disabled={isLoading}
-              />
-            </div>
-
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={fecharModalUpdateValue} className="flex-1" disabled={isLoading}>
-                Cancelar
-              </Button>
-              <Button type="submit" className="flex-1" disabled={isLoading}>
-                {isLoading ? 'Atualizando...' : 'Atualizar'}
               </Button>
             </div>
           </form>

@@ -147,8 +147,6 @@ export function useContas() {
         usuario_id: usuarioId
       };
       
-      console.log('Dados que serão inseridos:', dadosParaInserir);
-
       const { data, error } = await supabase
         .from('contas_bancarias')
         .insert(dadosParaInserir)
@@ -171,18 +169,8 @@ export function useContas() {
       return true
     } catch (error) {
       if (!isTableNotExistsError(error, 'contas_bancarias')) {
-        console.error('Erro ao adicionar conta:', error);
-        
-        // Log mais detalhado do erro
-        const errorObj = error as any;
-        console.error('Detalhes do erro:', {
-          message: errorObj?.message,
-          code: errorObj?.code,
-          details: errorObj?.details,
-          hint: errorObj?.hint
-        });
-        
         // Mostrar erro mais específico para o usuário
+        const errorObj = error as any;
         const errorMessage = errorObj?.message || 'Erro desconhecido';
         toast.error(`Erro ao adicionar conta: ${errorMessage}`);
       }
@@ -200,8 +188,6 @@ export function useContas() {
         usuario_id: parseInt(user.id)
       };
       
-      console.log('Dados do cartão que serão inseridos:', dadosCartao);
-
       const { data, error } = await supabase
         .from('cartoes_credito')
         .insert(dadosCartao)
@@ -209,11 +195,6 @@ export function useContas() {
         .single()
 
       if (error) {
-        console.error('Erro detalhado na inserção do cartão:', error);
-        console.error('Código do erro:', error.code);
-        console.error('Mensagem do erro:', error.message);
-        console.error('Detalhes do erro:', error.details);
-        
         if (isTableNotExistsError(error, 'cartoes_credito')) {
           if (typeof window !== 'undefined' && !(window as any)._cartoesTableWarning) {
             (window as any)._cartoesTableWarning = true;
@@ -224,24 +205,13 @@ export function useContas() {
         throw error
       }
 
-      console.log('Cartão inserido com sucesso:', data);
       setCartoes(prev => [data, ...prev])
       toast.success('Cartão de crédito adicionado com sucesso!')
       return true
     } catch (error) {
       if (!isTableNotExistsError(error, 'cartoes_credito')) {
-        console.error('Erro ao adicionar cartão:', error);
-        
-        // Log mais detalhado do erro
-        const errorObj = error as any;
-        console.error('Detalhes do erro:', {
-          message: errorObj?.message,
-          code: errorObj?.code,
-          details: errorObj?.details,
-          hint: errorObj?.hint
-        });
-        
         // Mostrar erro mais específico para o usuário
+        const errorObj = error as any;
         const errorMessage = errorObj?.message || 'Erro desconhecido';
         toast.error(`Erro ao adicionar cartão: ${errorMessage}`);
       }
@@ -275,7 +245,6 @@ export function useContas() {
       return true
     } catch (error) {
       if (!isTableNotExistsError(error, 'contas_bancarias')) {
-        console.error('Erro ao atualizar conta:', error);
         toast.error('Erro ao atualizar conta');
       }
       return false
@@ -304,7 +273,6 @@ export function useContas() {
       return true
     } catch (error) {
       if (!isTableNotExistsError(error, 'contas_bancarias')) {
-        console.error('Erro ao excluir conta:', error);
         toast.error('Erro ao excluir conta');
       }
       return false
@@ -317,12 +285,6 @@ export function useContas() {
 
   const getCartoesPorConta = (contaId: number): CartaoCredito[] => {
     const cartoesEncontrados = cartoes.filter(cartao => cartao.conta_bancaria_id === contaId)
-    console.log(`getCartoesPorConta(${contaId}):`, {
-      totalCartoes: cartoes.length,
-      cartoesEncontrados: cartoesEncontrados.length,
-      todosCartoes: cartoes,
-      filtrados: cartoesEncontrados
-    });
     return cartoesEncontrados
   }
 

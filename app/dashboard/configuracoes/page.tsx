@@ -7,7 +7,8 @@ import useCategorias, { type Categoria } from '@/hooks/useCategorias'
 import useBancos from '@/hooks/useBancos'
 import useCartoes, { type CartaoUsuario } from '@/hooks/useCartoes'
 import useContas, { type ContaBancaria, type CartaoCredito } from '@/hooks/useContas'
-import { supabase } from '@/lib/supabase'
+import { useTransacoes } from '@/hooks/useSupabaseData'
+import { supabase, Transacao } from '@/lib/supabase'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
@@ -20,6 +21,34 @@ import { Trash2, Plus, Edit, Save, X, Settings, User, CreditCard, Tags, Wallet, 
 import { toast } from 'sonner'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+
+// Função para calcular saldo atual de uma conta baseado nas transações
+const calcularSaldoAtual = (contaId: number, saldoInicial: number, transacoes: Transacao[]): number => {
+  const transacoesDaConta = transacoes.filter(transacao => 
+    transacao.conta_bancaria_id === contaId ||
+    transacao.conta_origem_id === contaId ||
+    transacao.conta_destino_id === contaId
+  )
+
+  let saldoAtual = saldoInicial
+
+  transacoesDaConta.forEach(transacao => {
+    if (transacao.conta_bancaria_id === contaId) {
+      // Transação normal (entrada/saída/investimento)
+      saldoAtual += transacao.valor
+    } else if (transacao.tipo === 'transferencia') {
+      if (transacao.conta_origem_id === contaId) {
+        // Saída da conta origem (débito)
+        saldoAtual -= Math.abs(transacao.valor)
+      } else if (transacao.conta_destino_id === contaId) {
+        // Entrada na conta destino (crédito)
+        saldoAtual += Math.abs(transacao.valor)
+      }
+    }
+  })
+
+  return saldoAtual
+}
 
 export default function ConfiguracoesPage() {
   const router = useRouter()
@@ -53,6 +82,7 @@ export default function ConfiguracoesPage() {
     toggleContaAtiva,
     getCartoesPorConta
   } = useContas()
+  const { transacoes } = useTransacoes()
   const [loading, setLoading] = useState(false)
   
   // Estados locais
@@ -556,94 +586,104 @@ export default function ConfiguracoesPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 md:px-6 lg:px-8 py-6 space-y-6 max-w-7xl">
-        {/* Header com botão de voltar */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8 px-2">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => window.history.back()}
-              className="hover:bg-muted"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Voltar
-            </Button>
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <Settings className="h-6 w-6 text-primary" />
-              </div>
-              <div>
-                <h1 className="text-xl md:text-2xl font-bold text-foreground">Configurações</h1>
-                <p className="text-xs md:text-sm text-muted-foreground">
-                  Gerencie seus dados pessoais, contas e cartões
-                </p>
+      {/* Header fixo */}
+      <div className="sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border shadow-sm">
+        <div className="container mx-auto px-3 md:px-6 lg:px-8 py-4 md:py-6 max-w-7xl">
+          {/* Header com botão de voltar */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 md:gap-4 px-1 md:px-2">
+            <div className="flex items-center gap-3 md:gap-4 w-full sm:w-auto">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => window.history.back()}
+                className="hover:bg-muted flex-shrink-0"
+              >
+                <ArrowLeft className="h-4 w-4 mr-1 md:mr-2" />
+                <span className="hidden xs:inline">Voltar</span>
+              </Button>
+              <div className="flex items-center gap-2 md:gap-3 min-w-0">
+                <div className="p-1.5 md:p-2 bg-primary/10 rounded-lg flex-shrink-0">
+                  <Settings className="h-5 w-5 md:h-6 md:w-6 text-primary" />
+                </div>
+                <div className="min-w-0">
+                  <h1 className="text-lg md:text-xl lg:text-2xl font-bold text-foreground truncate">Configurações</h1>
+                  <p className="text-xs md:text-sm text-muted-foreground hidden sm:block">
+                    Gerencie seus dados pessoais, contas e cartões
+                  </p>
+                </div>
               </div>
             </div>
           </div>
         </div>
-        <Tabs defaultValue="pessoais" className="space-y-6 px-2">
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 bg-muted p-1 rounded-lg">
+      </div>
+
+      {/* Conteúdo principal */}
+      <div className="container mx-auto px-3 md:px-6 lg:px-8 py-4 md:py-6 space-y-4 md:space-y-6 max-w-7xl">
+        <Tabs defaultValue="pessoais" className="space-y-4 md:space-y-6 px-1 md:px-2">
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 bg-muted p-1 rounded-lg h-auto">
             <TabsTrigger 
               value="pessoais" 
-              className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground text-xs md:text-sm"
+              className="flex items-center gap-1 md:gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground text-xs md:text-sm py-2 md:py-2.5"
             >
-              <User className="h-4 w-4" />
-              <span className="hidden sm:inline">Dados Pessoais</span>
-              <span className="sm:hidden">Dados</span>
+              <User className="h-3 w-3 md:h-4 md:w-4" />
+              <span className="hidden xs:inline">Dados</span>
+              <span className="xs:hidden">Dados</span>
             </TabsTrigger>
             <TabsTrigger 
               value="contas" 
-              className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground text-xs md:text-sm"
+              className="flex items-center gap-1 md:gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground text-xs md:text-sm py-2 md:py-2.5"
             >
-              <Wallet className="h-4 w-4" />
-              Contas
+              <Wallet className="h-3 w-3 md:h-4 md:w-4" />
+              <span className="hidden xs:inline">Contas</span>
+              <span className="xs:hidden">Contas</span>
             </TabsTrigger>
             <TabsTrigger 
               value="cartoes" 
-              className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground text-xs md:text-sm"
+              className="flex items-center gap-1 md:gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground text-xs md:text-sm py-2 md:py-2.5"
             >
-              <CreditCard className="h-4 w-4" />
-              Cartões
+              <CreditCard className="h-3 w-3 md:h-4 md:w-4" />
+              <span className="hidden xs:inline">Cartões</span>
+              <span className="xs:hidden">Cartões</span>
             </TabsTrigger>
             <TabsTrigger 
               value="categorias" 
-              className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground text-xs md:text-sm"
+              className="flex items-center gap-1 md:gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground text-xs md:text-sm py-2 md:py-2.5"
             >
-              <Tags className="h-4 w-4" />
-              <span className="hidden sm:inline">Categorias</span>
-              <span className="sm:hidden">Cats</span>
+              <Tags className="h-3 w-3 md:h-4 md:w-4" />
+              <span className="hidden xs:inline">Categorias</span>
+              <span className="xs:hidden">Categorias</span>
             </TabsTrigger>
-          </TabsList>        <TabsContent value="pessoais" className="space-y-6 px-1">
+          </TabsList>        <TabsContent value="pessoais" className="space-y-4 md:space-y-6 px-0 md:px-1">
           <Card>
-            <CardHeader>
-              <CardTitle>Informações Pessoais</CardTitle>
-              <CardDescription>
+            <CardHeader className="pb-4 md:pb-6">
+              <CardTitle className="text-lg md:text-xl">Informações Pessoais</CardTitle>
+              <CardDescription className="text-sm">
                 Atualize seus dados pessoais aqui
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4 p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <CardContent className="space-y-4 p-4 md:p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="nome">Nome</Label>
+                  <Label htmlFor="nome" className="text-sm font-medium">Nome</Label>
                   <Input
                     id="nome"
                     value={nome}
                     onChange={(e) => setNome(e.target.value)}
                     placeholder="Seu nome completo"
+                    className="h-10"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="email" className="text-sm font-medium">Email</Label>
                   <Input
                     id="email"
                     value={email}
                     disabled
-                    className="bg-muted border-border text-muted-foreground cursor-not-allowed"
+                    className="bg-muted border-border text-muted-foreground cursor-not-allowed h-10"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="telefone">Telefone</Label>
+                  <Label htmlFor="telefone" className="text-sm font-medium">Telefone</Label>
                   <Input
                     id="telefone"
                     value={telefone}
@@ -702,28 +742,30 @@ export default function ConfiguracoesPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="contas" className="space-y-6 px-1">
+        <TabsContent value="contas" className="space-y-4 md:space-y-6 px-0 md:px-1">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>Gerenciar Contas Bancárias</CardTitle>
-                <CardDescription>
-                  Cadastre suas contas bancárias e associe cartões de crédito a elas.
-                </CardDescription>
-              </div>
-              <Dialog open={showContaDialog} onOpenChange={setShowContaDialog}>
-                <DialogTrigger asChild>
-                  <Button onClick={() => abrirModalConta()}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Nova Conta
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[425px]">
-                  <DialogHeader>
-                    <DialogTitle>
+            <CardHeader className="pb-4 md:pb-6">
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4">
+                <div className="min-w-0">
+                  <CardTitle className="text-lg md:text-xl">Gerenciar Contas Bancárias</CardTitle>
+                  <CardDescription className="text-sm">
+                    Cadastre suas contas bancárias e associe cartões de crédito a elas.
+                  </CardDescription>
+                </div>
+                <Dialog open={showContaDialog} onOpenChange={setShowContaDialog}>
+                  <DialogTrigger asChild>
+                    <Button onClick={() => abrirModalConta()} className="w-full sm:w-auto flex-shrink-0">
+                      <Plus className="h-4 w-4 mr-2" />
+                      <span className="hidden xs:inline">Nova Conta</span>
+                      <span className="xs:hidden">Nova</span>
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="w-[95vw] max-w-[425px] max-h-[90vh] overflow-y-auto mx-auto">
+                  <DialogHeader className="pb-4">
+                    <DialogTitle className="text-lg">
                       {editandoConta ? 'Editar Conta' : 'Nova Conta'}
                     </DialogTitle>
-                    <DialogDescription>
+                    <DialogDescription className="text-sm">
                       {editandoConta 
                         ? 'Edite as informações da conta abaixo.'
                         : 'Preencha as informações da sua nova conta bancária.'
@@ -733,12 +775,12 @@ export default function ConfiguracoesPage() {
                   
                   <form onSubmit={handleSubmitConta} className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="banco">Banco</Label>
+                      <Label htmlFor="banco" className="text-sm font-medium">Banco</Label>
                       <Select 
                         value={formConta.banco_id} 
                         onValueChange={(value) => setFormConta(prev => ({...prev, banco_id: value}))}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="h-10">
                           <SelectValue placeholder="Selecione o banco" />
                         </SelectTrigger>
                         <SelectContent>
@@ -811,18 +853,20 @@ export default function ConfiguracoesPage() {
                       <Label htmlFor="ativo">Conta ativa</Label>
                     </div>
 
-                    <div className="flex justify-end space-x-2">
+                    <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-2 sm:space-x-0 pt-4">
                       <Button
                         type="button"
                         variant="outline"
                         onClick={fecharModalConta}
                         disabled={loading}
+                        className="w-full sm:w-auto order-2 sm:order-1"
                       >
                         Cancelar
                       </Button>
                       <Button 
                         type="submit" 
                         disabled={loading}
+                        className="w-full sm:w-auto order-1 sm:order-2"
                       >
                         {loading 
                           ? 'Salvando...' 
@@ -835,6 +879,7 @@ export default function ConfiguracoesPage() {
                   </form>
                 </DialogContent>
               </Dialog>
+              </div>
             </CardHeader>
             <CardContent className="p-6">
               {loadingContas ? (
@@ -869,6 +914,9 @@ export default function ConfiguracoesPage() {
                           <div className="text-sm text-muted-foreground space-y-1">
                             <p>Banco: {conta.banco?.nome || 'Banco não encontrado'}</p>
                             <p>Saldo Inicial: {formatarMoeda(conta.saldo_inicial)}</p>
+                            <p className={`font-medium ${calcularSaldoAtual(conta.id, conta.saldo_inicial, transacoes) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                              Saldo Atual: {formatarMoeda(calcularSaldoAtual(conta.id, conta.saldo_inicial, transacoes))}
+                            </p>
                           </div>
                           
                           {/* Cartões associados */}
@@ -989,17 +1037,17 @@ export default function ConfiguracoesPage() {
 
           {/* Modal para adicionar cartão à conta */}
           <Dialog open={showCartaoContaDialog} onOpenChange={setShowCartaoContaDialog}>
-            <DialogContent className="sm:max-w-[425px]">
-              <DialogHeader>
-                <DialogTitle>Associar Cartão à Conta</DialogTitle>
-                <DialogDescription>
+            <DialogContent className="w-[95vw] max-w-[425px] max-h-[90vh] overflow-y-auto mx-auto">
+              <DialogHeader className="pb-4">
+                <DialogTitle className="text-lg">Associar Cartão à Conta</DialogTitle>
+                <DialogDescription className="text-sm">
                   Adicione um cartão de crédito a esta conta bancária.
                 </DialogDescription>
               </DialogHeader>
               
               <form onSubmit={handleSubmitCartaoConta} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="final_cartao_conta">Final do Cartão</Label>
+                  <Label htmlFor="final_cartao_conta" className="text-sm font-medium">Final do Cartão</Label>
                   <Input
                     id="final_cartao_conta"
                     value={formCartaoConta.final_cartao}
@@ -1010,12 +1058,13 @@ export default function ConfiguracoesPage() {
                     placeholder="1234"
                     maxLength={4}
                     required
+                    className="h-10"
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="data_fechamento_conta">Dia Fechamento</Label>
+                    <Label htmlFor="data_fechamento_conta" className="text-sm font-medium">Dia Fechamento</Label>
                     <Input
                       id="data_fechamento_conta"
                       type="number"
@@ -1028,11 +1077,12 @@ export default function ConfiguracoesPage() {
                       }))}
                       placeholder="10"
                       required
+                      className="h-10"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="data_vencimento_conta">Dia Vencimento</Label>
+                    <Label htmlFor="data_vencimento_conta" className="text-sm font-medium">Dia Vencimento</Label>
                     <Input
                       id="data_vencimento_conta"
                       type="number"
@@ -1045,6 +1095,7 @@ export default function ConfiguracoesPage() {
                       }))}
                       placeholder="15"
                       required
+                      className="h-10"
                     />
                   </div>
                 </div>
@@ -1066,18 +1117,20 @@ export default function ConfiguracoesPage() {
                   />
                 </div>
 
-                <div className="flex justify-end space-x-2">
+                <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-2 sm:space-x-0 pt-4">
                   <Button
                     type="button"
                     variant="outline"
                     onClick={fecharModalCartaoConta}
                     disabled={loading}
+                    className="w-full sm:w-auto order-2 sm:order-1"
                   >
                     Cancelar
                   </Button>
                   <Button 
                     type="submit" 
                     disabled={loading}
+                    className="w-full sm:w-auto order-1 sm:order-2"
                   >
                     {loading ? 'Salvando...' : 'Adicionar Cartão'}
                   </Button>
@@ -1088,20 +1141,20 @@ export default function ConfiguracoesPage() {
 
           {/* Modal para associar cartão existente à conta */}
           <Dialog open={showAssociarCartaoDialog} onOpenChange={setShowAssociarCartaoDialog}>
-            <DialogContent className="sm:max-w-[500px]">
-              <DialogHeader>
-                <DialogTitle>Associar Cartão Existente</DialogTitle>
-                <DialogDescription>
+            <DialogContent className="w-[95vw] max-w-[500px] max-h-[90vh] overflow-y-auto mx-auto">
+              <DialogHeader className="pb-4">
+                <DialogTitle className="text-lg">Associar Cartão Existente</DialogTitle>
+                <DialogDescription className="text-sm">
                   Selecione um cartão existente para associar a esta conta bancária.
                 </DialogDescription>
               </DialogHeader>
               
               <div className="space-y-4">
                 {getCartoesNaoAssociados().length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <CreditCard className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p>Nenhum cartão disponível para associação.</p>
-                    <p className="text-sm mt-2">
+                  <div className="text-center py-6 md:py-8 text-muted-foreground">
+                    <CreditCard className="h-10 w-10 md:h-12 md:w-12 mx-auto mb-3 md:mb-4 opacity-50" />
+                    <p className="text-sm md:text-base">Nenhum cartão disponível para associação.</p>
+                    <p className="text-xs md:text-sm mt-2">
                       Crie cartões na aba "Cartões" primeiro.
                     </p>
                   </div>
@@ -1111,15 +1164,15 @@ export default function ConfiguracoesPage() {
                     {getCartoesNaoAssociados().map((cartao) => (
                       <div
                         key={cartao.id}
-                        className="flex items-center justify-between p-3 border border-border rounded-lg hover:bg-muted/50 transition-colors"
+                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 border border-border rounded-lg hover:bg-muted/50 transition-colors"
                       >
-                        <div className="flex items-center gap-3">
-                          <CreditCard className="h-4 w-4 text-muted-foreground" />
-                          <div>
-                            <div className="font-medium text-foreground">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <CreditCard className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                          <div className="min-w-0">
+                            <div className="font-medium text-foreground text-sm md:text-base">
                               Cartão **** {cartao.final_cartao}
                             </div>
-                            <div className="text-sm text-muted-foreground">
+                            <div className="text-xs md:text-sm text-muted-foreground">
                               {cartao.banco?.nome} • Limite: {formatarMoeda(cartao.limite)}
                             </div>
                             <div className="text-xs text-muted-foreground">
@@ -1131,6 +1184,7 @@ export default function ConfiguracoesPage() {
                           size="sm"
                           onClick={() => handleAssociarCartao(cartao.id)}
                           disabled={loading}
+                          className="flex-shrink-0 w-full sm:w-auto"
                         >
                           Associar
                         </Button>
@@ -1139,11 +1193,12 @@ export default function ConfiguracoesPage() {
                   </div>
                 )}
 
-                <div className="flex justify-end">
+                <div className="flex justify-end pt-2">
                   <Button
                     type="button"
                     variant="outline"
                     onClick={fecharModalAssociarCartao}
+                    className="w-full sm:w-auto"
                   >
                     Cancelar
                   </Button>
@@ -1153,28 +1208,30 @@ export default function ConfiguracoesPage() {
           </Dialog>
         </TabsContent>
 
-        <TabsContent value="cartoes" className="space-y-6 px-1">
+        <TabsContent value="cartoes" className="space-y-4 md:space-y-6 px-0 md:px-1">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>Gerenciar Cartões Independentes</CardTitle>
-                <CardDescription>
-                  Cadastre cartões de crédito que não estão vinculados a uma conta específica.
-                </CardDescription>
-              </div>
-              <Dialog open={showCartaoDialog} onOpenChange={setShowCartaoDialog}>
-                <DialogTrigger asChild>
-                  <Button onClick={() => abrirModalCartao()}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Novo Cartão
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[425px]">
-                  <DialogHeader>
-                    <DialogTitle>
+            <CardHeader className="pb-4 md:pb-6">
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4">
+                <div className="min-w-0">
+                  <CardTitle className="text-lg md:text-xl">Gerenciar Cartões Independentes</CardTitle>
+                  <CardDescription className="text-sm">
+                    Cadastre cartões de crédito que não estão vinculados a uma conta específica.
+                  </CardDescription>
+                </div>
+                <Dialog open={showCartaoDialog} onOpenChange={setShowCartaoDialog}>
+                  <DialogTrigger asChild>
+                    <Button onClick={() => abrirModalCartao()} className="w-full sm:w-auto flex-shrink-0">
+                      <Plus className="h-4 w-4 mr-2" />
+                      <span className="hidden xs:inline">Novo Cartão</span>
+                      <span className="xs:hidden">Novo</span>
+                    </Button>
+                  </DialogTrigger>
+                <DialogContent className="w-[95vw] max-w-[425px] max-h-[90vh] overflow-y-auto mx-auto">
+                  <DialogHeader className="pb-4">
+                    <DialogTitle className="text-lg">
                       {editandoCartao ? 'Editar Cartão' : 'Novo Cartão'}
                     </DialogTitle>
-                    <DialogDescription>
+                    <DialogDescription className="text-sm">
                       {editandoCartao 
                         ? 'Edite as informações do cartão.'
                         : 'Preencha as informações do novo cartão de crédito.'
@@ -1184,12 +1241,12 @@ export default function ConfiguracoesPage() {
                   
                   <form onSubmit={handleSubmitCartao} className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="banco_cartao">Banco</Label>
+                      <Label htmlFor="banco_cartao" className="text-sm font-medium">Banco</Label>
                       <Select 
                         value={formCartao.banco_id} 
                         onValueChange={(value) => setFormCartao(prev => ({...prev, banco_id: value}))}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="h-10">
                           <SelectValue placeholder="Selecione o banco" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1203,7 +1260,7 @@ export default function ConfiguracoesPage() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="final_cartao">Final do Cartão</Label>
+                      <Label htmlFor="final_cartao" className="text-sm font-medium">Final do Cartão</Label>
                       <Input
                         id="final_cartao"
                         value={formCartao.final_cartao}
@@ -1214,12 +1271,13 @@ export default function ConfiguracoesPage() {
                         placeholder="1234"
                         maxLength={4}
                         required
+                        className="h-10"
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="data_fechamento">Dia Fechamento</Label>
+                        <Label htmlFor="data_fechamento" className="text-sm font-medium">Dia Fechamento</Label>
                         <Input
                           id="data_fechamento"
                           type="number"
@@ -1232,11 +1290,12 @@ export default function ConfiguracoesPage() {
                           }))}
                           placeholder="10"
                           required
+                          className="h-10"
                         />
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="data_vencimento">Dia Vencimento</Label>
+                        <Label htmlFor="data_vencimento" className="text-sm font-medium">Dia Vencimento</Label>
                         <Input
                           id="data_vencimento"
                           type="number"
@@ -1282,18 +1341,20 @@ export default function ConfiguracoesPage() {
                       <Label htmlFor="ativo">Cartão ativo</Label>
                     </div>
 
-                    <div className="flex justify-end space-x-2">
+                    <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-2 sm:space-x-0 pt-4">
                       <Button
                         type="button"
                         variant="outline"
                         onClick={fecharModalCartao}
                         disabled={loading}
+                        className="w-full sm:w-auto order-2 sm:order-1"
                       >
                         Cancelar
                       </Button>
                       <Button 
                         type="submit" 
                         disabled={loading}
+                        className="w-full sm:w-auto order-1 sm:order-2"
                       >
                         {loading 
                           ? 'Salvando...' 
@@ -1306,6 +1367,7 @@ export default function ConfiguracoesPage() {
                   </form>
                 </DialogContent>
               </Dialog>
+              </div>
             </CardHeader>
             <CardContent className="p-6">
               {loadingCartoes ? (
@@ -1398,21 +1460,21 @@ export default function ConfiguracoesPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="categorias" className="space-y-6 px-1">
+        <TabsContent value="categorias" className="space-y-4 md:space-y-6 px-0 md:px-1">
           <Card>
-            <CardHeader>
-              <CardTitle>Categorias Disponíveis</CardTitle>
-              <CardDescription>
+            <CardHeader className="pb-4 md:pb-6">
+              <CardTitle className="text-lg md:text-xl">Categorias Disponíveis</CardTitle>
+              <CardDescription className="text-sm">
                 Categorias disponíveis para suas transações. Você pode personalizar as cores de cada categoria.
               </CardDescription>
             </CardHeader>
-            <CardContent className="p-6">
+            <CardContent className="p-4 md:p-6">
               {loadingCategorias ? (
-                <div className="flex items-center justify-center py-8">
-                  <p>Carregando categorias...</p>
+                <div className="flex items-center justify-center py-6 md:py-8">
+                  <p className="text-sm">Carregando categorias...</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
                   {categorias.map((categoria) => (
                     <div
                       key={categoria.id}

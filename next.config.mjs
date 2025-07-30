@@ -13,10 +13,7 @@ const nextConfig = {
     fetches: {
       fullUrl: false,
     },
-  },
-  experimental: {
-    logging: 'error',
-  },
+  }
 }
 
 export default nextConfig

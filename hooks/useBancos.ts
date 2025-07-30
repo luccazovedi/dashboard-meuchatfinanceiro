@@ -32,7 +32,7 @@ export function useBancos() {
         setBancos(data)
       }
     } catch (error) {
-      console.error('Erro ao carregar bancos:', error)
+      
     } finally {
       setLoading(false)
     }

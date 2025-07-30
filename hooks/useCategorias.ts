@@ -25,23 +25,17 @@ export function useCategorias() {
     try {
       setLoading(true)
       
-      console.log('🔍 Iniciando carregamento de categorias...')
-      
       // Buscar categorias da tabela global
       const { data: categoriasGlobais, error } = await supabase
         .from('categorias')
         .select('*')
         .order('nome')
 
-      console.log('📊 Resultado categorias:', { data: categoriasGlobais, error })
-
       if (error) {
-        console.error('❌ Erro na query categorias:', error)
         throw error
       }
 
       if (!categoriasGlobais || categoriasGlobais.length === 0) {
-        console.warn('⚠️ Nenhuma categoria encontrada')
         setCategorias([])
         return
       }
@@ -54,10 +48,9 @@ export function useCategorias() {
           const coresStorage = localStorage.getItem(`categorias_cores_${user.id}`)
           if (coresStorage) {
             coresPersonalizadas = JSON.parse(coresStorage)
-            console.log('🎨 Cores personalizadas carregadas do localStorage:', coresPersonalizadas)
           }
         } catch (err) {
-          console.warn('⚠️ Erro ao carregar cores do localStorage:', err)
+          // Erro silencioso no localStorage
         }
       }
 
@@ -67,11 +60,9 @@ export function useCategorias() {
         cor_usuario: coresPersonalizadas[categoria.id] || categoria.cor_padrao
       }))
 
-      console.log('✅ Categorias finais:', categoriasComCores)
       setCategorias(categoriasComCores)
       
     } catch (error) {
-      console.error('💥 Erro ao carregar categorias:', error)
       toast.error('Erro ao carregar categorias')
     } finally {
       setLoading(false)
@@ -95,8 +86,6 @@ export function useCategorias() {
     }
 
     try {
-      console.log('🎨 Atualizando cor da categoria:', { id, cor, user_id: user.id })
-      
       // Carregar cores existentes do localStorage
       const storageKey = `categorias_cores_${user.id}`
       let coresPersonalizadas: Record<number, string> = {}
@@ -107,7 +96,7 @@ export function useCategorias() {
           coresPersonalizadas = JSON.parse(coresStorage)
         }
       } catch (err) {
-        console.warn('⚠️ Erro ao carregar cores do localStorage:', err)
+        // Erro silencioso no localStorage
       }
 
       // Atualizar a cor da categoria específica
@@ -115,8 +104,6 @@ export function useCategorias() {
       
       // Salvar no localStorage
       localStorage.setItem(storageKey, JSON.stringify(coresPersonalizadas))
-      
-      console.log('✅ Cor salva no localStorage:', coresPersonalizadas)
 
       // Atualizar o estado local
       setCategorias(prev => 
@@ -126,7 +113,6 @@ export function useCategorias() {
       toast.success('Cor da categoria atualizada!')
       return true
     } catch (error) {
-      console.error('💥 Erro ao atualizar cor da categoria:', error)
       toast.error('Erro ao atualizar cor da categoria')
       return false
     }

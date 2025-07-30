@@ -9,41 +9,113 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// Tipos para as tabelas do banco
+// Tipos atualizados para a tabela de transações
 export interface Transacao {
   id: number
+  usuario_id: number // Alterado para inteiro
+  categoria_id: number
+  conta_bancaria_id?: number
+  cartao_credito_id?: number
+  tipo_pagamento_id?: number
+  
+  // Campos específicos para transferências
+  conta_origem_id?: number
+  conta_destino_id?: number
+  
+  // Campos básicos obrigatórios
   descricao: string
-  categoria: string
   valor: number
-  data: string
-  tipo: 'entrada' | 'saida' | 'investimento'
-  user_id?: string
-  created_at?: string
-  updated_at?: string
+  data_transacao: string
+  tipo: string // 'entrada', 'saida', 'investimento', 'transferencia'
+  
+  // Timestamps
+  data_criacao?: string
+  data_atualizacao?: string
 }
 
 export interface Investimento {
-  id: number
-  nome: string
+  usuario_id: string
+  nome_investimento: string
   tipo: string
-  valor: number
-  rentabilidade: string
-  vencimento: string
-  user_id?: string
-  created_at?: string
-  updated_at?: string
+  valor_investimento: number
+  rendimento: number
+  data_aplicacao: string
+  data_criacao: string
+  data_atualizacao: string
 }
 
 export interface Meta {
   id: number
   titulo: string
-  valor_atual: number
+  descricao?: string
   valor_meta: number
+  valor_atual: number
   categoria: string
-  prazo: string
-  user_id?: string
+  prazo?: string
+  status: 'ativa' | 'concluida' | 'pausada' | 'cancelada'
+  usuario_id?: number
   created_at?: string
   updated_at?: string
+}
+
+// Novas interfaces atualizadas para as tabelas adicionais
+export interface Despesa {
+  id: number
+  usuario_id: string
+  categoria_id: number
+  descricao: string
+  valor: number
+  data_despesa: string
+  data_criacao: string
+  data_atualizacao: string
+}
+
+export interface Entrada {
+  id: number
+  usuario_id: string
+  categoria_id: number
+  descricao: string
+  valor: number
+  data_despesa: string // Mantendo o nome da coluna original
+  data_criacao: string
+  data_atualizacao: string
+}
+
+export interface ContaAPagar {
+  id?: number
+  usuario_id?: number
+  conta_bancaria_id?: number | null
+  descricao: string
+  valor_total: number
+  qtd_parcelas: number
+  parcela_atual: number
+  valor_parcela: number
+  data_vencimento: string
+  quitado: boolean
+  data_criacao?: string
+  data_atualizacao?: string
+}
+
+export interface ParcelaCota {
+  id?: number
+  cota_id?: number
+  numero_parcela: number
+  valor_parcela: number
+  data_vencimento: string
+  data_pagamento?: string
+  quitado: boolean
+  observacao?: string
+  data_criacao?: string
+  data_atualizacao?: string
+}
+
+// Interface para categorias do banco externo
+export interface Categoria {
+  id: number
+  nome: string
+  cor_padrao: string
+  created_at: string
+  updated_at: string
 }
 
 // Configuração de autenticação
@@ -96,6 +168,56 @@ export interface ConfiguracaoUsuario {
       cor: string
     }>
   }
+  created_at?: string
+  updated_at?: string
+}
+
+// Interfaces para tabelas de referência
+export interface ContaBancaria {
+  id: number
+  usuario_id: number
+  banco_id: number
+  nome_conta: string
+  tipo_conta: string // 'corrente', 'poupanca', 'investimento'
+  saldo_inicial?: number
+  ativo: boolean
+  data_criacao?: string
+  data_atualizacao?: string
+}
+
+export interface CartaoCredito {
+  id: number
+  usuario_id: number
+  nome_cartao: string
+  bandeira: string // 'visa', 'mastercard', 'elo', 'amex'
+  ultimos_digitos?: string
+  limite?: number
+  vencimento_fatura?: number // Dia do mês (1-31)
+  ativo: boolean
+  created_at?: string
+  updated_at?: string
+}
+
+// Interface específica para a tabela cartoes_usuario
+export interface CartaoUsuario {
+  id: number
+  user_id: number
+  banco_id: number
+  final_cartao: string
+  data_fechamento: string
+  data_vencimento: string
+  limite: number
+  ativo: boolean
+  created_at?: string
+  updated_at?: string
+  conta_bancaria_id: number
+}
+
+export interface TipoPagamento {
+  id: number
+  nome: string
+  descricao?: string
+  ativo: boolean
   created_at?: string
   updated_at?: string
 }

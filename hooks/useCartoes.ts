@@ -69,7 +69,7 @@ export function useCartoes() {
       if (error) {
         // Se a tabela não existe, não é um erro crítico
         if (error.code === 'PGRST116' || error.message?.includes('relation "cartoes_usuario" does not exist')) {
-          console.warn('Tabela cartoes_usuario não existe ainda. Execute o script SQL para criá-la.')
+          
           setCartoes([])
           return
         }
@@ -78,28 +78,15 @@ export function useCartoes() {
 
       setCartoes(data || [])
     } catch (error) {
-      // Debug temporário para entender o erro
-      console.log('DEBUG - Erro capturado:', {
-        error,
-        type: typeof error,
-        isError: error instanceof Error,
-        message: (error as any)?.message || 'sem message',
-        code: (error as any)?.code || 'sem code',
-        details: (error as any)?.details || 'sem details',
-        stringified: JSON.stringify(error)
-      });
-      
       if (isTableNotExistsError(error)) {
         // Não loga erro, apenas avisa uma vez por sessão
         if (typeof window !== 'undefined' && !(window as any)._cartoesTableWarning) {
           (window as any)._cartoesTableWarning = true;
-          console.warn('⚠️ Tabela cartoes_usuario não configurada. Execute o script SQL no Supabase.');
           toast.error('Tabela de cartões não configurada. Execute o script SQL no Supabase.');
         }
         setCartoes([]);
       } else {
         // Só loga erros reais que não sejam de configuração
-        console.error('Erro ao carregar cartões:', error);
         toast.error('Erro ao carregar cartões');
       }
     } finally {
@@ -127,7 +114,7 @@ export function useCartoes() {
         if (isTableNotExistsError(error)) {
           if (typeof window !== 'undefined' && !(window as any)._cartoesTableWarning) {
             (window as any)._cartoesTableWarning = true;
-            console.warn('⚠️ Tabela cartoes_usuario não configurada.');
+            
             toast.error('Tabela de cartões não configurada. Execute o script SQL no Supabase.');
           }
           return false
@@ -142,7 +129,7 @@ export function useCartoes() {
       if (isTableNotExistsError(error)) {
         // Já tratado acima, não faz nada
       } else {
-        console.error('Erro ao adicionar cartão:', error);
+        
         toast.error('Erro ao adicionar cartão');
       }
       return false
@@ -168,7 +155,7 @@ export function useCartoes() {
         if (isTableNotExistsError(error)) {
           if (typeof window !== 'undefined' && !(window as any)._cartoesTableWarning) {
             (window as any)._cartoesTableWarning = true;
-            console.warn('⚠️ Tabela cartoes_usuario não configurada.');
+            
             toast.error('Tabela de cartões não configurada. Execute o script SQL no Supabase.');
           }
           return false
@@ -185,7 +172,7 @@ export function useCartoes() {
       if (isTableNotExistsError(error)) {
         // Já tratado acima
       } else {
-        console.error('Erro ao atualizar cartão:', error);
+        
         toast.error('Erro ao atualizar cartão');
       }
       return false
@@ -206,7 +193,7 @@ export function useCartoes() {
         if (isTableNotExistsError(error)) {
           if (typeof window !== 'undefined' && !(window as any)._cartoesTableWarning) {
             (window as any)._cartoesTableWarning = true;
-            console.warn('⚠️ Tabela cartoes_usuario não configurada.');
+            
             toast.error('Tabela de cartões não configurada. Execute o script SQL no Supabase.');
           }
           return false
@@ -221,7 +208,7 @@ export function useCartoes() {
       if (isTableNotExistsError(error)) {
         // Já tratado acima
       } else {
-        console.error('Erro ao excluir cartão:', error);
+        
         toast.error('Erro ao excluir cartão');
       }
       return false
