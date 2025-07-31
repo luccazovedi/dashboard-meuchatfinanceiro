@@ -83,8 +83,8 @@ export interface Entrada {
 
 export interface ContaAPagar {
   id?: number
-  usuario_id?: number
-  conta_bancaria_id?: number | null
+  usuario_id: number
+  conta_bancaria_id: number
   descricao: string
   valor_total: number
   qtd_parcelas: number

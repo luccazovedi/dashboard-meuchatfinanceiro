@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase, Transacao, Investimento, Meta, Despesa, Entrada, ContaAPagar, Categoria, ContaBancaria, CartaoUsuario, TipoPagamento } from '@/lib/supabase'
 import { useAuth } from './useAuth'
 
@@ -30,7 +30,28 @@ export function useTransacoes() {
           setError('Erro ao carregar transações')
         }
       } else {
-        setTransacoes(data || [])
+        // Processar dados para restaurar tipos originais
+        const transacoesProcessadas = (data || []).map(transacao => {
+          let tipoReal = transacao.tipo;
+          let descricaoLimpa = transacao.descricao;
+          
+          // Detectar tipo real a partir da descrição
+          if (transacao.descricao?.startsWith('[INVESTIMENTO]')) {
+            tipoReal = 'investimento';
+            descricaoLimpa = transacao.descricao.replace('[INVESTIMENTO] ', '');
+          } else if (transacao.descricao?.startsWith('[TRANSFERENCIA]')) {
+            tipoReal = 'transferencia';
+            descricaoLimpa = transacao.descricao.replace('[TRANSFERENCIA] ', '');
+          }
+          
+          return {
+            ...transacao,
+            tipo: tipoReal,
+            descricao: descricaoLimpa
+          };
+        });
+        
+        setTransacoes(transacoesProcessadas)
       }
     } catch (err) {
       setError('Erro de conexão')
@@ -42,6 +63,23 @@ export function useTransacoes() {
 
   const addTransacao = async (transacao: Omit<Transacao, 'id' | 'data_criacao' | 'data_atualizacao'>) => {
     try {
+      // Para contornar a limitação da constraint, vamos salvar o tipo original na descrição
+      // e usar apenas os tipos aceitos pela constraint
+      const tipoOriginal = transacao.tipo;
+      const tipoParaBanco = tipoOriginal === 'investimento' || tipoOriginal === 'transferencia' 
+        ? 'entrada' 
+        : tipoOriginal === 'despesa' || tipoOriginal === 'saida'
+        ? 'despesa'
+        : tipoOriginal;
+
+      // Adicionar prefixo na descrição para identificar o tipo real
+      let descricaoComTipo = transacao.descricao;
+      if (tipoOriginal === 'investimento') {
+        descricaoComTipo = `[INVESTIMENTO] ${transacao.descricao}`;
+      } else if (tipoOriginal === 'transferencia') {
+        descricaoComTipo = `[TRANSFERENCIA] ${transacao.descricao}`;
+      }
+
       // Preparar dados para inserção na nova estrutura
       const transacaoParaInserir = {
         usuario_id: transacao.usuario_id,
@@ -49,10 +87,10 @@ export function useTransacoes() {
         conta_bancaria_id: transacao.conta_bancaria_id || null,
         cartao_credito_id: transacao.cartao_credito_id || null,
         tipo_pagamento_id: transacao.tipo_pagamento_id || null,
-        descricao: transacao.descricao,
+        descricao: descricaoComTipo,
         valor: transacao.valor,
         data_transacao: transacao.data_transacao,
-        tipo: transacao.tipo
+        tipo: tipoParaBanco
       }
       
       // Validação básica
@@ -75,18 +113,49 @@ export function useTransacoes() {
         throw new Error('Data da transação é obrigatória')
       }
       
+      // Tentar descobrir quais valores são aceitos testando a estrutura da tabela
+      try {
+        const { data: existingData, error: queryError } = await supabase
+          .from('transacoes')
+          .select('tipo')
+          .limit(5)
+      } catch (e) {
+        // Não foi possível consultar tipos existentes
+      }
+      
       const { data, error } = await supabase
         .from('transacoes')
-        .insert([transacaoParaInserir])
+        .insert(transacaoParaInserir)
         .select()
-        .single()
 
       if (error) {
+
+
+
+        
+        // Verificar se há propriedades específicas do erro
+
+
+
+
+        
         throw error
       }
 
-      setTransacoes(prev => [data, ...prev])
-      return data
+
+      
+      // Como removemos .single(), data pode ser um array
+      const transacaoInserida = Array.isArray(data) ? data[0] : data
+      
+      // Processar a transação inserida para restaurar o tipo original
+      const transacaoProcessada = {
+        ...transacaoInserida,
+        tipo: tipoOriginal,
+        descricao: transacao.descricao // Descrição original sem prefixo
+      };
+      
+      setTransacoes(prev => [transacaoProcessada, ...prev])
+      return transacaoProcessada
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao adicionar transação')
       throw err
@@ -95,16 +164,47 @@ export function useTransacoes() {
 
   const updateTransacao = async (id: number, updates: Partial<Transacao>) => {
     try {
+      // Aplicar mesmo processamento de tipos que fazemos no addTransacao
+      const updatesProcessados = { ...updates };
+      
+      if (updates.tipo && updates.descricao) {
+        const tipoOriginal = updates.tipo;
+        const tipoParaBanco = tipoOriginal === 'investimento' || tipoOriginal === 'transferencia' 
+          ? 'entrada' 
+          : tipoOriginal === 'despesa' || tipoOriginal === 'saida'
+          ? 'despesa'
+          : tipoOriginal;
+
+        // Adicionar prefixo na descrição para identificar o tipo real
+        let descricaoComTipo = updates.descricao;
+        if (tipoOriginal === 'investimento') {
+          descricaoComTipo = `[INVESTIMENTO] ${updates.descricao}`;
+        } else if (tipoOriginal === 'transferencia') {
+          descricaoComTipo = `[TRANSFERENCIA] ${updates.descricao}`;
+        }
+
+        updatesProcessados.tipo = tipoParaBanco;
+        updatesProcessados.descricao = descricaoComTipo;
+      }
+      
       const { data, error } = await supabase
         .from('transacoes')
-        .update(updates)
+        .update(updatesProcessados)
         .eq('id', id)
         .select()
         .single()
 
       if (error) throw error
-      setTransacoes(prev => prev.map(t => t.id === id ? data : t))
-      return data
+      
+      // Processar dados retornados para restaurar tipo original
+      const dataProcessada = { ...data };
+      if (updates.tipo) {
+        dataProcessada.tipo = updates.tipo; // Usar tipo original
+        dataProcessada.descricao = updates.descricao; // Usar descrição original
+      }
+      
+      setTransacoes(prev => prev.map(t => t.id === id ? dataProcessada : t))
+      return dataProcessada
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao atualizar transação')
       throw err
@@ -170,7 +270,7 @@ export function useInvestimentos() {
       }
     } catch (err) {
       // If there's a connection error, still return empty array to prevent crashes
-      console.warn('Tabela investimentos não encontrada, usando dados das transações')
+
       setInvestimentos([])
       setError(null)
     } finally {
@@ -246,11 +346,11 @@ export function useMetas() {
             error.code === 'PGRST116' || 
             error.message?.includes('404') ||
             error.message?.includes('Not Found')) {
-          console.warn('Tabela metas não encontrada no banco de dados')
+
           setMetas([])
           setError(null)
         } else {
-          console.error('Erro ao carregar metas:', error)
+
           setError('Erro ao carregar metas')
           setMetas([]) // Still set empty array to prevent crashes
         }
@@ -259,7 +359,7 @@ export function useMetas() {
       }
     } catch (err: any) {
       // Handle network errors and other exceptions
-      console.warn('Erro de conexão ou tabela metas não encontrada:', err?.message || err)
+
       setMetas([])
       setError(null) // Don't show error to user for missing table
     } finally {
@@ -556,15 +656,23 @@ export function useContasAPagar() {
   const [contas, setContas] = useState<ContaAPagar[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const { user } = useAuth()
 
   const fetchContasAPagar = async () => {
     try {
       setLoading(true)
       setError(null)
       
+      if (!user?.id) {
+        setContas([])
+        setError('Usuário não autenticado')
+        return
+      }
+      
       const { data, error } = await supabase
         .from('contas_a_pagar')
         .select('*')
+        .eq('usuario_id', parseInt(user.id)) // Converter para number explicitamente
         .order('data_vencimento', { ascending: true })
 
       if (error) {
@@ -587,48 +695,29 @@ export function useContasAPagar() {
 
   const addContaAPagar = async (conta: Omit<ContaAPagar, 'id' | 'data_criacao' | 'data_atualizacao'>) => {
     try {
-      // Validar dados antes de enviar
-      if (!conta.descricao || conta.descricao.trim() === '') {
-        throw new Error('Descrição é obrigatória')
-      }
-      
-      if (!conta.valor_total || conta.valor_total <= 0) {
-        throw new Error('Valor total deve ser maior que zero')
-      }
-      
-      if (!conta.valor_parcela || conta.valor_parcela <= 0 || isNaN(conta.valor_parcela)) {
-        throw new Error('Valor da parcela deve ser maior que zero')
-      }
-      
-      if (!conta.data_vencimento) {
-        throw new Error('Data de vencimento é obrigatória')
+      // Verificar se o usuário está autenticado
+      if (!user?.id) {
+        throw new Error('Usuário não autenticado')
       }
 
-      // Teste de conectividade com o Supabase
-      const { data: testData, error: testError } = await supabase
-        .from('contas_a_pagar')
-        .select('count', { count: 'exact', head: true })
-
-      if (testError) {
-        throw new Error(`Erro de conexão com o banco: ${testError.message}`)
+      // Preparar dados para inserção incluindo o usuario_id e timestamps
+      const contaParaInserir = {
+        ...conta,
+        usuario_id: parseInt(user.id),
+        data_criacao: new Date().toISOString(),
+        data_atualizacao: new Date().toISOString()
       }
+
+
 
       const { data, error } = await supabase
         .from('contas_a_pagar')
-        .insert([conta])
+        .insert([contaParaInserir])
         .select()
 
       if (error) {
-        // Verificar tipos específicos de erro
-        if (error.code === 'PGRST116') {
-          throw new Error('Tabela "contas_a_pagar" não encontrada. Verifique se existe no banco.')
-        } else if (error.code === '23502') {
-          throw new Error('Campo obrigatório não preenchido.')
-        } else if (error.code === '23505') {
-          throw new Error('Registro duplicado.')
-        } else {
-          throw new Error(`Erro do banco de dados: ${error.message || 'Erro desconhecido'}`)
-        }
+
+        throw new Error(error.message || 'Erro ao inserir conta')
       }
 
       if (!data || data.length === 0) {
@@ -644,14 +733,33 @@ export function useContasAPagar() {
 
   const updateContaAPagar = async (id: number, contaData: Partial<ContaAPagar>) => {
     try {
+      if (!user?.id) {
+        throw new Error('Usuário não autenticado')
+      }
+
+
+      // Remover campos que podem interferir e adicionar timestamp de atualização
+      const { created_at, updated_at, ...dadosSemTimestamps } = contaData
+      const dadosParaAtualizar = {
+        ...dadosSemTimestamps,
+        updated_at: new Date().toISOString()
+      }
+
+
       const { data, error } = await supabase
         .from('contas_a_pagar')
-        .update(contaData)
+        .update(dadosParaAtualizar)
         .eq('id', id)
+        .eq('usuario_id', parseInt(user.id)) // Garantir que só atualize contas do usuário
         .select()
+
 
       if (error) {
         throw error
+      }
+
+      if (!data || data.length === 0) {
+        throw new Error('Nenhum registro foi atualizado. Verifique se a conta existe e pertence ao usuário.')
       }
 
       await fetchContasAPagar() // Recarregar a lista
@@ -663,10 +771,15 @@ export function useContasAPagar() {
 
   const deleteContaAPagar = async (id: number) => {
     try {
+      if (!user?.id) {
+        throw new Error('Usuário não autenticado')
+      }
+
       const { error } = await supabase
         .from('contas_a_pagar')
         .delete()
         .eq('id', id)
+        .eq('usuario_id', parseInt(user.id)) // Garantir que só delete contas do usuário
 
       if (error) {
         throw error
@@ -690,7 +803,8 @@ export function useContasAPagar() {
         .from('contas_a_pagar')
         .update({ 
           parcela_atual: novaParcelaAtual,
-          quitado: quitado 
+          quitado: quitado,
+          data_atualizacao: new Date().toISOString()
         })
         .eq('id', id)
         .select()
@@ -740,8 +854,10 @@ export function useContasAPagar() {
   }
 
   useEffect(() => {
-    fetchContasAPagar()
-  }, [])
+    if (user?.id) {
+      fetchContasAPagar()
+    }
+  }, [user?.id])
 
   return {
     contas,

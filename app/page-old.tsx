@@ -77,12 +77,6 @@ export default function HomePage() {
   
   // Debug logs
   useEffect(() => {
-    console.log('🔍 Debug - Dados carregados:')
-    console.log('📊 Contas bancárias:', contasBancarias.length, contasBancarias)
-    console.log('💳 Cartões de crédito:', cartoesCredito.length, cartoesCredito)
-    console.log('💰 Tipos de pagamento (banco):', tiposPagamento.length, tiposPagamento)
-    console.log('� Tipos de pagamento (usando):', tiposPagamentoParaUsar.length, tiposPagamentoParaUsar)
-    console.log('�👤 Usuário logado:', user?.id)
   }, [contasBancarias, cartoesCredito, tiposPagamento, user])
   
   // Categorias de fallback caso não carregue do banco
@@ -115,12 +109,6 @@ export default function HomePage() {
   
   // Debug logs
   useEffect(() => {
-    console.log('🔍 Debug - Dados carregados:')
-    console.log('📊 Contas bancárias:', contasBancarias.length, contasBancarias)
-    console.log('💳 Cartões de crédito:', cartoesCredito.length, cartoesCredito)
-    console.log('💰 Tipos de pagamento (banco):', tiposPagamento.length, tiposPagamento)
-    console.log('🎭 Tipos de pagamento (usando):', tiposPagamentoParaUsar.length, tiposPagamentoParaUsar)
-    console.log('👤 Usuário logado:', user?.id)
   }, [contasBancarias, cartoesCredito, tiposPagamento, tiposPagamentoParaUsar, user])
   
   // Estados locais
@@ -334,10 +322,6 @@ export default function HomePage() {
     setIsLoading(true)
 
     try {
-      console.log('🎯 Iniciando salvamento de transação')
-      console.log('📋 Dados do formulário:', formTransacao)
-      console.log('👤 Usuário:', user?.id)
-      console.log('🏷️ Categorias disponíveis:', categoriasParaUsar.length)
       
       let valor = parseFloat(formTransacao.valor)
       
@@ -354,16 +338,12 @@ export default function HomePage() {
       if (formTransacao.tipo === 'transferencia') {
         // Para transferências, usar categoria fixa ID 13
         categoria_id = 13
-        console.log('🔄 Transferência: usando categoria ID 13 automaticamente')
       } else {
         // Para outros tipos, buscar categoria baseada no nome selecionado
         const categoriasFiltradas = getCategoriasPorTipo(formTransacao.tipo)
         const categoria = categoriasFiltradas.find(c => c.nome === formTransacao.categoria)
-        console.log('🔍 Categoria encontrada:', categoria)
-        console.log('🏷️ Categorias filtradas para', formTransacao.tipo, ':', categoriasFiltradas.length)
         
         if (!categoria) {
-          console.error('❌ Categoria não encontrada:', formTransacao.categoria)
           setError('Categoria não encontrada')
           return
         }
@@ -383,20 +363,15 @@ export default function HomePage() {
         tipo_pagamento_id: formTransacao.tipo_pagamento_id ? parseInt(formTransacao.tipo_pagamento_id) : undefined
       }
       
-      console.log('📤 Dados preparados para envio:', transacaoData)
 
       if (transacaoEditando) {
-        console.log('✏️ Editando transação existente')
         await updateTransacao(transacaoEditando.id, transacaoData)
       } else {
-        console.log('➕ Criando nova transação')
         await addTransacao(transacaoData)
       }
 
-      console.log('✅ Transação salva com sucesso!')
       fecharModalTransacao()
     } catch (err) {
-      console.error('💥 Erro ao salvar transação:', err)
       setError(err instanceof Error ? err.message : 'Erro ao salvar transação')
     } finally {
       setIsLoading(false)
@@ -440,11 +415,6 @@ export default function HomePage() {
   const saldoAtual = totalEntradas - totalSaidas - totalInvestimentos
 
   // Debug dos totais
-  console.log('📊 Debug dos totais:')
-  console.log('💰 Total Entradas:', totalEntradas, 'de', transacoes.filter(t => t.tipo === "entrada").length, 'transações')
-  console.log('💸 Total Saídas:', totalSaidas, 'de', transacoes.filter(t => t.tipo === "despesa").length, 'transações')
-  console.log('📈 Total Investimentos:', totalInvestimentos, 'de', transacoes.filter(t => t.tipo === "investimento").length, 'transações')
-  console.log('🏦 Saldo Atual:', saldoAtual)
 
   const formatarMoeda = (valor: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -659,7 +629,7 @@ export default function HomePage() {
                   <MenuIcon className="h-4 w-4" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right" className="w-[300px] sm:w-[400px]">
+              <SheetContent side="right" className="w-[280px] sm:w-[320px] md:w-[360px] lg:w-[400px]">
                 <SheetHeader>
                   <SheetTitle>Menu</SheetTitle>
                 </SheetHeader>

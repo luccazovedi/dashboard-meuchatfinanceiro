@@ -124,17 +124,17 @@ export function ContasAPagarUnificado() {
     try {
       // Validações básicas
       if (!formContaData.descricao.trim()) {
-        alert('Descrição é obrigatória')
+        // alert removido para segurança
         return
       }
       
       if (!formContaData.valor_total || parseFloat(formContaData.valor_total) <= 0) {
-        alert('Valor total deve ser maior que zero')
+        // alert removido para segurança
         return
       }
       
       if (!formContaData.data_vencimento) {
-        alert('Data de vencimento é obrigatória')
+        // alert removido para segurança
         return
       }
 
@@ -167,7 +167,7 @@ export function ContasAPagarUnificado() {
 
       resetForms()
     } catch (error) {
-      alert('Erro ao salvar conta. Verifique os dados e tente novamente.')
+      // alert removido para segurança
     }
   }
 

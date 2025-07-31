@@ -114,3 +114,82 @@ body {
   filter: contrast(1.2) brightness(1.2);
   filter: invert(1);
 }
+
+/* Ajustes para menu lateral no desktop - sobreposição até metade da tela */
+@media (min-width: 768px) {
+  /* Menus laterais em tablets e desktop */
+  [data-state="open"][data-side="right"] {
+    max-width: 50vw !important;
+    width: 50vw !important;
+  }
+  
+  [data-state="open"][data-side="left"] {
+    max-width: 50vw !important;
+    width: 50vw !important;
+  }
+}
+
+@media (min-width: 1024px) {
+  /* Em telas grandes, limitar ainda mais para melhor UX */
+  [data-state="open"][data-side="right"] {
+    max-width: 45vw !important;
+    width: 45vw !important;
+  }
+  
+  [data-state="open"][data-side="left"] {
+    max-width: 45vw !important;
+    width: 45vw !important;
+  }
+}
+
+@media (min-width: 1280px) {
+  /* Em telas muito grandes, usar largura fixa para não ficar muito grande */
+  [data-state="open"][data-side="right"] {
+    max-width: 600px !important;
+    width: 600px !important;
+  }
+  
+  [data-state="open"][data-side="left"] {
+    max-width: 600px !important;
+    width: 600px !important;
+  }
+}
+
+/* Garantir que cards sejam flexíveis e não quebrem */
+.grid > * {
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Cards responsivos com tamanhos iguais e altura uniforme */
+.grid-cols-2 > *, 
+.md\\:grid-cols-3 > *, 
+.lg\\:grid-cols-6 > * {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+}
+
+/* Garantir que todos os cards tenham altura igual */
+.grid > .h-full {
+  display: flex;
+  flex-direction: column;
+}
+
+.grid > .h-full > * {
+  flex: 1;
+}
+
+/* Melhorar o comportamento de texto longo em cards */
+.text-2xl {
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+/* Responsividade para números grandes */
+@media (max-width: 640px) {
+  .text-2xl {
+    font-size: 1.25rem; /* text-xl em mobile para números muito grandes */
+    line-height: 1.75rem;
+  }
+}

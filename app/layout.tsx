@@ -6,8 +6,13 @@ import { Toaster } from '@/components/ui/sonner'
 import '@/lib/console-suppressor'
 
 export const metadata: Metadata = {
-  title: 'Demo Finanças',
+  title: 'MeuChatFinanceiro',
   generator: 'v0.dev',
+  icons: {
+    icon: '/logo.jpg',
+    shortcut: '/logo.jpg',
+    apple: '/logo.jpg',
+  },
 }
 
 const inter = Inter({

@@ -20,7 +20,8 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 
 // Importações do Supabase
 import { useAuth } from "@/hooks/useAuth"
-import { useTransacoes, useInvestimentos, useMetas, useDespesas, useEntradas, useContasAPagar, useCategorias, useContasBancarias, useCartoesCredito, useTiposPagamento } from "@/hooks/useSupabaseData"
+import { useTransacoes, useInvestimentos, useMetas, useDespesas, useEntradas, useCategorias, useContasBancarias, useCartoesCredito, useTiposPagamento } from "@/hooks/useSupabaseData"
+import { useContasAPagarV2 } from "@/hooks/useContasAPagarV2"
 import { supabase, Transacao, Investimento, Meta, Categoria } from "@/lib/supabase"
 
 // Função para calcular saldo atual de uma conta baseado nas transações
@@ -80,7 +81,7 @@ export default function HomePage() {
   } = useMetas()
   const { despesas, loading: despesasLoading, error: despesasError } = useDespesas()
   const { entradas, loading: entradasLoading, error: entradasError } = useEntradas()
-  const { contas: contasAPagar, loading: contasLoading, error: contasError } = useContasAPagar()
+  const { contas: contasAPagar, loading: contasLoading, error: contasError, addContaAPagar, updateContaAPagar, deleteContaAPagar, refetch: refetchContasAPagar } = useContasAPagarV2()
   const { categorias, loading: categoriasLoading, error: categoriasError } = useCategorias()
   
   // Novos hooks para dados de referência
@@ -120,6 +121,7 @@ export default function HomePage() {
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState("")
+  const [success, setSuccess] = useState("")
   const [nomeUsuario, setNomeUsuario] = useState("")
   const [formData, setFormData] = useState({
     email: "",
@@ -151,6 +153,18 @@ export default function HomePage() {
     status: "ativa" as Meta['status']
   })
   
+  // Estados para contas a pagar
+  const [modalContaAberto, setModalContaAberto] = useState(false)
+  const [contaEditando, setContaEditando] = useState<any | null>(null)
+  const [formConta, setFormConta] = useState({
+    descricao: "",
+    valor_total: "",
+    qtd_parcelas: "",
+    data_vencimento: "",
+    conta_bancaria_id: "",
+    quitado: false
+  })
+  
   // Estados do modal de transação
   const [modalTransacaoAberto, setModalTransacaoAberto] = useState(false)
   const [transacaoEditando, setTransacaoEditando] = useState<Transacao | null>(null)
@@ -169,9 +183,21 @@ export default function HomePage() {
     conta_destino_id: ""
   })
 
+  // Estado de timeout de segurança para evitar loading infinito
+  const [loadingTimeout, setLoadingTimeout] = useState(false)
+
   // Executar inicialização
   useEffect(() => {
     // Componente inicializado
+  }, [])
+
+  // Timeout de segurança para evitar loading infinito
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setLoadingTimeout(true)
+    }, 10000) // 10 segundos
+
+    return () => clearTimeout(timer)
   }, [])
 
   // Carregar nome do usuário do banco de dados
@@ -276,8 +302,126 @@ export default function HomePage() {
     }
   }
 
+  // Função para filtrar transações por período
+  const filtrarTransacoesPorPeriodo = (transacoes: Transacao[]) => {
+    const hoje = new Date()
+    
+    switch (periodoSelecionado) {
+      case 'mes-atual':
+        const inicioMesAtual = new Date(hoje.getFullYear(), hoje.getMonth(), 1)
+        const fimMesAtual = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0, 23, 59, 59)
+        return transacoes.filter(t => {
+          const dataTransacao = new Date(t.data_transacao)
+          return dataTransacao >= inicioMesAtual && dataTransacao <= fimMesAtual
+        })
+      
+      case 'mes-anterior':
+        const inicioMesAnterior = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1)
+        const fimMesAnterior = new Date(hoje.getFullYear(), hoje.getMonth(), 0, 23, 59, 59)
+        return transacoes.filter(t => {
+          const dataTransacao = new Date(t.data_transacao)
+          return dataTransacao >= inicioMesAnterior && dataTransacao <= fimMesAnterior
+        })
+      
+      case 'trimestre':
+        const inicioTrimestre = new Date(hoje.getFullYear(), hoje.getMonth() - 2, 1)
+        const fimTrimestre = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0, 23, 59, 59)
+        return transacoes.filter(t => {
+          const dataTransacao = new Date(t.data_transacao)
+          return dataTransacao >= inicioTrimestre && dataTransacao <= fimTrimestre
+        })
+      
+      case 'ano':
+        const inicioAno = new Date(hoje.getFullYear(), 0, 1)
+        const fimAno = new Date(hoje.getFullYear(), 11, 31, 23, 59, 59)
+        return transacoes.filter(t => {
+          const dataTransacao = new Date(t.data_transacao)
+          return dataTransacao >= inicioAno && dataTransacao <= fimAno
+        })
+      
+      case 'futuras':
+        // Para transações futuras (caso existam), a partir de amanhã
+        const amanha = new Date(hoje)
+        amanha.setDate(hoje.getDate() + 1)
+        amanha.setHours(0, 0, 0, 0)
+        return transacoes.filter(t => {
+          const dataTransacao = new Date(t.data_transacao)
+          return dataTransacao >= amanha
+        })
+      
+      default:
+        return transacoes
+    }
+  }
+
+  // Função para filtrar contas a pagar por período (mesmo que transações)
+  const filtrarContasPorPeriodo = (contas: any[]) => {
+    if (!contas) return []
+    
+    const hoje = new Date()
+    
+    switch (periodoSelecionado) {
+      case 'mes-atual':
+        const inicioMesAtual = new Date(hoje.getFullYear(), hoje.getMonth(), 1)
+        const fimMesAtual = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0, 23, 59, 59)
+        return contas.filter(conta => {
+          const dataVencimento = new Date(conta.data_vencimento)
+          return dataVencimento >= inicioMesAtual && dataVencimento <= fimMesAtual
+        })
+      
+      case 'mes-anterior':
+        const inicioMesAnterior = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1)
+        const fimMesAnterior = new Date(hoje.getFullYear(), hoje.getMonth(), 0, 23, 59, 59)
+        return contas.filter(conta => {
+          const dataVencimento = new Date(conta.data_vencimento)
+          return dataVencimento >= inicioMesAnterior && dataVencimento <= fimMesAnterior
+        })
+      
+      case 'trimestre':
+        const inicioTrimestre = new Date(hoje.getFullYear(), hoje.getMonth() - 2, 1)
+        const fimTrimestre = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0, 23, 59, 59)
+        return contas.filter(conta => {
+          const dataVencimento = new Date(conta.data_vencimento)
+          return dataVencimento >= inicioTrimestre && dataVencimento <= fimTrimestre
+        })
+      
+      case 'ano':
+        const inicioAno = new Date(hoje.getFullYear(), 0, 1)
+        const fimAno = new Date(hoje.getFullYear(), 11, 31, 23, 59, 59)
+        return contas.filter(conta => {
+          const dataVencimento = new Date(conta.data_vencimento)
+          return dataVencimento >= inicioAno && dataVencimento <= fimAno
+        })
+      
+      case 'futuras':
+        // Contas futuras: a partir de amanhã em diante
+        const amanha = new Date(hoje)
+        amanha.setDate(hoje.getDate() + 1)
+        amanha.setHours(0, 0, 0, 0)
+        return contas.filter(conta => {
+          const dataVencimento = new Date(conta.data_vencimento)
+          return dataVencimento >= amanha
+        })
+      
+      default:
+        return contas
+    }
+  }
+
+  // Função para obter o nome do período selecionado
+  const getNomePeriodo = () => {
+    switch (periodoSelecionado) {
+      case 'mes-atual': return 'Este mês'
+      case 'mes-anterior': return 'Mês anterior'
+      case 'trimestre': return 'Último trimestre'
+      case 'ano': return 'Este ano'
+      case 'futuras': return 'Contas futuras'
+      default: return 'Período'
+    }
+  }
+
   // Funções do modal de transação
-  const abrirModalTransacao = (transacao?: Transacao) => {
+  const abrirModalTransacao = (transacao?: Transacao, tipoPreSelecionado?: string) => {
     setError("") // Limpar erros anteriores
     
     if (transacao) {
@@ -286,7 +430,9 @@ export default function HomePage() {
       
       setFormTransacao({
         descricao: transacao.descricao,
-        categoria: transacao.tipo === 'transferencia' ? '13' : (categoria?.nome || ""),
+        categoria: transacao.tipo === 'transferencia' ? '13' : 
+                  transacao.tipo === 'investimento' ? '12' : 
+                  (categoria?.nome || ""),
         valor: Math.abs(transacao.valor).toString(), // Mostrar valor absoluto
         data: transacao.data_transacao,
         tipo: transacao.tipo,
@@ -300,12 +446,21 @@ export default function HomePage() {
       })
     } else {
       setTransacaoEditando(null)
+      
+      // Configurar categoria baseada no tipo pré-selecionado
+      let categoriaInicial = ""
+      if (tipoPreSelecionado === 'transferencia') {
+        categoriaInicial = '13'
+      } else if (tipoPreSelecionado === 'investimento') {
+        categoriaInicial = '12'
+      }
+      
       setFormTransacao({
         descricao: "",
-        categoria: "",
+        categoria: categoriaInicial,
         valor: "",
         data: new Date().toISOString().split('T')[0],
-        tipo: "entrada",
+        tipo: tipoPreSelecionado || "entrada",
         // IDs de referência (opcionais)
         conta_bancaria_id: "",
         cartao_credito_id: "",
@@ -373,6 +528,9 @@ export default function HomePage() {
       if (formTransacao.tipo === 'transferencia') {
         // Para transferências, usar categoria fixa ID 13
         categoria_id = 13
+      } else if (formTransacao.tipo === 'investimento') {
+        // Para investimentos, usar categoria fixa ID 12
+        categoria_id = 12
       } else {
         // Para outros tipos, buscar categoria baseada no nome selecionado
         const categoriasFiltradas = getCategoriasPorTipo(formTransacao.tipo)
@@ -542,35 +700,183 @@ export default function HomePage() {
     }))
   }
 
-  // Usar dados diretos do banco de dados Supabase
-  const transacoesExibir = transacoes
-  const investimentosExibir = investimentos
-  const metasExibir = metas
+  // Funções para contas a pagar
+  const handleInputContaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value, type, checked } = e.target
+    setFormConta(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }))
+  }
 
-  // Filtrar transações baseado no filtro selecionado
-  const transacoesFiltradas = transacoesExibir.filter((transacao: Transacao) => {
+  const handleSubmitConta = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsLoading(true)
+    setError('')
+
+    try {
+      const valorTotal = parseFloat(formConta.valor_total)
+      const qtdParcelas = parseInt(formConta.qtd_parcelas)
+      
+      // Validações básicas
+      if (isNaN(valorTotal) || valorTotal <= 0) {
+        throw new Error('Valor total deve ser um número válido maior que zero')
+      }
+      
+      if (isNaN(qtdParcelas) || qtdParcelas <= 0) {
+        throw new Error('Quantidade de parcelas deve ser um número válido maior que zero')
+      }
+      
+      if (!formConta.descricao?.trim()) {
+        throw new Error('Descrição é obrigatória')
+      }
+      
+      if (!formConta.data_vencimento) {
+        throw new Error('Data de vencimento é obrigatória')
+      }
+      
+      // Calcular valor da parcela automaticamente
+      const valorParcela = valorTotal / qtdParcelas
+
+      const contaData = {
+        descricao: formConta.descricao.trim(),
+        valor_parcela: Number(valorParcela.toFixed(2)), // Será calculado automaticamente no backend também
+        qtd_parcelas: qtdParcelas,
+        valor_total: valorTotal,
+        data_vencimento: formConta.data_vencimento,
+        conta_bancaria_id: formConta.conta_bancaria_id && formConta.conta_bancaria_id !== '' ? parseInt(formConta.conta_bancaria_id) : null,
+        quitado: formConta.quitado || false,
+        parcela_atual: 1
+      }
+
+      if (contaEditando) {
+        // Enviar apenas os campos específicos para update
+        const dadosParaUpdate = {
+          descricao: contaData.descricao,
+          qtd_parcelas: contaData.qtd_parcelas,
+          valor_total: contaData.valor_total,
+          data_vencimento: contaData.data_vencimento,
+          conta_bancaria_id: contaData.conta_bancaria_id,
+          quitado: contaData.quitado,
+          parcela_atual: contaData.parcela_atual
+        }
+        
+        if (!contaEditando.id) {
+          throw new Error('ID da conta não encontrado para atualização')
+        }
+        
+        await updateContaAPagar(contaEditando.id, dadosParaUpdate)
+        setSuccess('Conta atualizada com sucesso!')
+      } else {
+        await addContaAPagar(contaData)
+        setSuccess('Conta adicionada com sucesso!')
+      }
+
+      fecharModalConta()
+      refetchContasAPagar()
+    } catch (error) {
+      let errorMessage = 'Erro ao salvar conta. Tente novamente.'
+      
+      if (error instanceof Error) {
+        errorMessage = error.message
+      } else if (typeof error === 'object' && error !== null) {
+        if ('message' in error) {
+          errorMessage = (error as any).message
+        } else if ('error' in error) {
+          errorMessage = (error as any).error
+        }
+      }
+      
+      setError(errorMessage)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const abrirModalConta = (conta?: any) => {
+    if (conta) {
+      setContaEditando(conta)
+      setFormConta({
+        descricao: conta.descricao || '',
+        valor_total: conta.valor_total?.toString() || '',
+        qtd_parcelas: conta.qtd_parcelas?.toString() || '',
+        data_vencimento: conta.data_vencimento || '',
+        conta_bancaria_id: conta.conta_bancaria_id?.toString() || '',
+        quitado: conta.quitado || false
+      })
+    } else {
+      setContaEditando(null)
+      setFormConta({
+        descricao: "",
+        valor_total: "",
+        qtd_parcelas: "",
+        data_vencimento: "",
+        conta_bancaria_id: "",
+        quitado: false
+      })
+    }
+    setModalContaAberto(true)
+  }
+
+  const fecharModalConta = () => {
+    setModalContaAberto(false)
+    setContaEditando(null)
+    setError('')
+    setSuccess('')
+    setFormConta({
+      descricao: "",
+      valor_total: "",
+      qtd_parcelas: "",
+      data_vencimento: "",
+      conta_bancaria_id: "",
+      quitado: false
+    })
+  }
+
+  const handleDeleteConta = async (id: number) => {
+    if (confirm('Tem certeza que deseja excluir esta conta?')) {
+      try {
+        await deleteContaAPagar(id)
+        setSuccess('Conta excluída com sucesso!')
+        refetchContasAPagar()
+      } catch (error) {
+        setError('Erro ao excluir conta. Tente novamente.')
+      }
+    }
+  }
+
+  // Usar dados diretos do banco de dados Supabase com fallbacks
+  const transacoesExibir = transacoes || []
+  const investimentosExibir = investimentos || []
+  const metasExibir = metas || []
+
+  // Aplicar filtro de período às transações
+  const transacoesFiltradaPorPeriodo = filtrarTransacoesPorPeriodo(transacoesExibir)
+
+  // Filtrar transações baseado no filtro selecionado (tipo + período)
+  const transacoesFiltradas = transacoesFiltradaPorPeriodo.filter((transacao: Transacao) => {
     if (filtroTransacao === "todas") return true
     return transacao.tipo === filtroTransacao
   })
 
-  // Calcular totais para os cards (usando todas as transações)
-  const totalEntradas = transacoes
+  // Calcular totais para os cards (usando transações do período selecionado)
+  const totalEntradas = (transacoesFiltradaPorPeriodo || [])
     .filter((t: Transacao) => t.tipo === "entrada")
-    .reduce((sum: number, t: Transacao) => sum + t.valor, 0)
+    .reduce((sum: number, t: Transacao) => sum + (t.valor || 0), 0)
   
-  const totalDespesas = Math.abs(transacoes
+  const totalDespesas = Math.abs((transacoesFiltradaPorPeriodo || [])
     .filter((t: Transacao) => t.tipo === "despesa")
-    .reduce((sum: number, t: Transacao) => sum + t.valor, 0))
+    .reduce((sum: number, t: Transacao) => sum + (t.valor || 0), 0))
   
-  const totalInvestimentosTransacoes = Math.abs(transacoes
+  const totalInvestimentosTransacoes = Math.abs((transacoesFiltradaPorPeriodo || [])
     .filter((t: Transacao) => t.tipo === "investimento")
-    .reduce((sum: number, t: Transacao) => sum + t.valor, 0))
+    .reduce((sum: number, t: Transacao) => sum + (t.valor || 0), 0))
   
   // Total de investimentos reais (da tabela investimentos)
-  const totalInvestimentosReais = investimentos
+  const totalInvestimentosReais = (investimentos || [])
     .reduce((sum: number, inv: Investimento) => sum + (inv.valor_investimento || 0), 0)
   
-  // Usar investimentos reais se existirem, senão usar das transações
+  // Usar investimentos reais se existirem, senão usar das transações do período
   const totalInvestimentos = totalInvestimentosReais > 0 ? totalInvestimentosReais : totalInvestimentosTransacoes
   
   const saldoAtual = totalEntradas - totalDespesas - totalInvestimentosTransacoes
@@ -598,7 +904,8 @@ export default function HomePage() {
     )
   }
 
-  if (transacoesLoading || investimentosLoading || metasLoading || despesasLoading || entradasLoading || contasLoading || contasBancariasLoading || cartoesCreditoLoading || tiposPagamentoLoading) {
+  // Simplificar loading - apenas verificar os hooks principais
+  if ((transacoesLoading || contasLoading) && !loadingTimeout) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center space-y-4">
@@ -621,7 +928,7 @@ export default function HomePage() {
               </div>
             </div>
             <CardTitle className="text-2xl text-center">
-              Dashboard MeuChatFinanceiro
+              Dashboard financeiro
             </CardTitle>
             <CardDescription className="text-center">
               Entre com seu email, usuário ou telefone para acessar o dashboard
@@ -713,8 +1020,9 @@ export default function HomePage() {
               size="sm"
               onClick={handleWhatsAppRedirect}
               className="flex items-center space-x-2 bg-green-50 hover:bg-green-100 border-green-200 text-green-700 dark:bg-green-900 dark:hover:bg-green-800 dark:border-green-700 dark:text-green-300"
+              aria-label="Falar com o Fin via WhatsApp"
             >
-              <MessageCircleIcon className="h-4 w-4" />
+              <img src="/whatsapp.png" alt="WhatsApp" className="h-4 w-4" />
               <span>Fale com o Fin</span>
             </Button>
             {/* Botão de Configuração */}
@@ -723,6 +1031,7 @@ export default function HomePage() {
                 variant="outline"
                 size="sm"
                 className="flex items-center space-x-2"
+                aria-label="Abrir configurações"
               >
                 <SettingsIcon className="h-4 w-4" />
               </Button>
@@ -734,6 +1043,7 @@ export default function HomePage() {
               size="sm"
               onClick={toggleTheme}
               className="flex items-center space-x-2"
+              aria-label={`Mudar para tema ${theme === 'dark' ? 'claro' : 'escuro'}`}
             >
               {theme === 'dark' ? (
                 <SunIcon className="h-4 w-4" />
@@ -749,6 +1059,7 @@ export default function HomePage() {
               size="sm"
               onClick={handleLogout}
               className="flex items-center space-x-2"
+              aria-label="Fazer logout da aplicação"
             >
               <LogOutIcon className="h-4 w-4" />
               <span>Sair</span>
@@ -763,22 +1074,28 @@ export default function HomePage() {
               size="sm"
               onClick={handleWhatsAppRedirect}
               className="flex items-center space-x-1 bg-green-50 hover:bg-green-100 border-green-200 text-green-700 dark:bg-green-900 dark:hover:bg-green-800 dark:border-green-700 dark:text-green-300"
+              aria-label="Falar com o Fin via WhatsApp"
             >
-              <MessageCircleIcon className="h-4 w-4" />
+              <img src="/whatsapp.png" alt="WhatsApp" className="h-4 w-4" />
               <span className="hidden xs:inline">Fin</span>
             </Button>
             
-            <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+            <Sheet 
+              open={mobileMenuOpen} 
+              onOpenChange={setMobileMenuOpen}
+              modal={true}
+            >
               <SheetTrigger asChild>
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" aria-label="Abrir menu">
                   <MenuIcon className="h-4 w-4" />
                 </Button>
               </SheetTrigger>
               <SheetContent 
                 side="right" 
-                className="w-[300px] sm:w-[400px]"
+                className="w-[280px] sm:w-[320px] md:w-[360px] lg:w-[400px]"
                 onOpenAutoFocus={(e) => e.preventDefault()}
                 onCloseAutoFocus={(e) => e.preventDefault()}
+                aria-describedby={undefined}
               >
                 <SheetHeader>
                   <SheetTitle>Menu</SheetTitle>
@@ -837,7 +1154,9 @@ export default function HomePage() {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
               <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-gray-100">Dashboard Financeiro</h1>
-              <p className="text-gray-600 dark:text-gray-300 mt-1">Visão geral das suas finanças pessoais</p>
+              <p className="text-gray-600 dark:text-gray-300 mt-1">
+                Visão geral das suas finanças pessoais - {getNomePeriodo()}
+              </p>
             </div>
             <div className="flex gap-2">
               <Select value={periodoSelecionado} onValueChange={setPeriodoSelecionado}>
@@ -850,139 +1169,225 @@ export default function HomePage() {
                   <SelectItem value="mes-anterior">Mês anterior</SelectItem>
                   <SelectItem value="trimestre">Último trimestre</SelectItem>
                   <SelectItem value="ano">Este ano</SelectItem>
+                  <SelectItem value="futuras">Contas futuras</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
 
-          {/* Cards de Resumo - Primeira Linha */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            {/* Saldo Atual */}
+          {/* Cards de Resumo Financeiro - Organizados por Importância */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* Saldo Atual - Card Principal */}
             <Card 
-              className="h-full cursor-pointer hover:shadow-md transition-shadow"
+              className="md:col-span-2 lg:col-span-1 cursor-pointer hover:shadow-lg transition-all duration-200 border-l-4 border-l-blue-500"
               onClick={() => abrirSidebar('saldo-atual')}
             >
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Saldo Atual</CardTitle>
-                <WalletIcon className="h-4 w-4 text-muted-foreground" />
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                <div>
+                  <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-300">Saldo Atual</CardTitle>
+                  <p className="text-xs text-muted-foreground mt-1">Balanço geral</p>
+                </div>
+                <div className="bg-blue-100 dark:bg-blue-900/20 p-2 rounded-lg">
+                  <WalletIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                </div>
               </CardHeader>
               <CardContent>
-                <div className={`text-2xl font-bold ${saldoAtual >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                <div className={`text-3xl font-bold mb-2 ${saldoAtual >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                   {formatarMoeda(saldoAtual)}
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Balanço geral
-                </p>
+                <div className="flex items-center text-xs text-muted-foreground">
+                  <span className="flex items-center">
+                    <div className="w-2 h-2 rounded-full bg-green-500 mr-1"></div>
+                    Entradas: {formatarMoeda(totalEntradas)}
+                  </span>
+                </div>
+                <div className="flex items-center text-xs text-muted-foreground mt-1">
+                  <span className="flex items-center">
+                    <div className="w-2 h-2 rounded-full bg-red-500 mr-1"></div>
+                    Saídas: {formatarMoeda(totalDespesas + totalInvestimentosTransacoes)}
+                  </span>
+                </div>
               </CardContent>
             </Card>
 
             {/* Entradas */}
-            <Card 
-              className="h-full cursor-pointer hover:shadow-md transition-shadow"
-              onClick={() => abrirSidebar('entradas')}
-            >
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Entradas</CardTitle>
-                <ArrowUpIcon className="h-4 w-4 text-green-600" />
+            <Card className="cursor-pointer hover:shadow-lg transition-all duration-200 border-l-4 border-l-green-500">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                <div>
+                  <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-300">Entradas</CardTitle>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {(transacoes || []).filter(t => t.tipo === 'entrada').length} transações
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      abrirModalTransacao(undefined, 'entrada')
+                    }}
+                    className="h-7 w-7 p-0 hover:bg-green-50 dark:hover:bg-green-900/20"
+                  >
+                    <PlusIcon className="h-3 w-3 text-green-600 dark:text-green-400" />
+                  </Button>
+                  <div className="bg-green-100 dark:bg-green-900/20 p-2 rounded-lg">
+                    <ArrowUpIcon className="h-5 w-5 text-green-600 dark:text-green-400" />
+                  </div>
+                </div>
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">
+              <CardContent onClick={() => abrirSidebar('entradas')}>
+                <div className="text-3xl font-bold text-green-600 dark:text-green-400 mb-2">
                   {formatarMoeda(totalEntradas)}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {transacoes.filter(t => t.tipo === 'entrada').length} registros
+                  Receitas no período
                 </p>
               </CardContent>
             </Card>
 
             {/* Despesas */}
-            <Card 
-              className="h-full cursor-pointer hover:shadow-md transition-shadow"
-              onClick={() => abrirSidebar('despesas')}
-            >
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Despesas</CardTitle>
-                <ArrowDownIcon className="h-4 w-4 text-red-600" />
+            <Card className="cursor-pointer hover:shadow-lg transition-all duration-200 border-l-4 border-l-red-500">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                <div>
+                  <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-300">Despesas</CardTitle>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {(transacoes || []).filter(t => t.tipo === 'despesa').length} transações
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      abrirModalTransacao(undefined, 'despesa')
+                    }}
+                    className="h-7 w-7 p-0 hover:bg-red-50 dark:hover:bg-red-900/20"
+                  >
+                    <PlusIcon className="h-3 w-3 text-red-600 dark:text-red-400" />
+                  </Button>
+                  <div className="bg-red-100 dark:bg-red-900/20 p-2 rounded-lg">
+                    <ArrowDownIcon className="h-5 w-5 text-red-600 dark:text-red-400" />
+                  </div>
+                </div>
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-red-600">
+              <CardContent onClick={() => abrirSidebar('despesas')}>
+                <div className="text-3xl font-bold text-red-600 dark:text-red-400 mb-2">
                   {formatarMoeda(totalDespesas)}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {transacoes.filter(t => t.tipo === 'despesa').length} registros
+                  Gastos no período
                 </p>
               </CardContent>
             </Card>
 
             {/* Investimentos */}
-            <Card 
-              className="h-full cursor-pointer hover:shadow-md transition-shadow"
-              onClick={() => abrirSidebar('investimentos')}
-            >
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Investimentos</CardTitle>
-                <TrendingUpIcon className="h-4 w-4 text-purple-600" />
+            <Card className="cursor-pointer hover:shadow-lg transition-all duration-200 border-l-4 border-l-purple-500">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                <div>
+                  <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-300">Investimentos</CardTitle>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {investimentos.length > 0 
+                      ? `${investimentos.length} aplicações` 
+                      : `${(transacoes || []).filter(t => t.tipo === 'investimento').length} transações`
+                    }
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      abrirModalTransacao(undefined, 'investimento')
+                    }}
+                    className="h-7 w-7 p-0 hover:bg-purple-50 dark:hover:bg-purple-900/20"
+                  >
+                    <PlusIcon className="h-3 w-3 text-purple-600 dark:text-purple-400" />
+                  </Button>
+                  <div className="bg-purple-100 dark:bg-purple-900/20 p-2 rounded-lg">
+                    <TrendingUpIcon className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                  </div>
+                </div>
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-purple-600">
+              <CardContent onClick={() => abrirSidebar('investimentos')}>
+                <div className="text-3xl font-bold text-purple-600 dark:text-purple-400 mb-2">
                   {formatarMoeda(totalInvestimentos)}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {investimentos.length > 0 
-                    ? `${investimentos.length} investimentos` 
-                    : `${transacoes.filter(t => t.tipo === 'investimento').length} transações`
-                  }
-                </p>
-              </CardContent>
-            </Card>
-
-            {/* Transações */}
-            <Card 
-              className="h-full cursor-pointer hover:shadow-md transition-shadow"
-              onClick={() => abrirSidebar('transacoes')}
-            >
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Transações</CardTitle>
-                <FileTextIcon className="h-4 w-4 text-blue-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-blue-600">
-                  {transacoes.length}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Total de movimentações
-                </p>
-              </CardContent>
-            </Card>
-
-            {/* Contas a Pagar */}
-            <Card 
-              className="cursor-pointer hover:shadow-md transition-shadow h-full"
-              onClick={() => abrirSidebar('contas-a-pagar')}
-            >
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Contas a Pagar</CardTitle>
-                <AlertTriangleIcon className="h-4 w-4 text-orange-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-orange-600">
-                  {formatarMoeda(contasAPagar.filter(c => !c.quitado).reduce((total, conta) => {
-                    const parcelasRestantes = conta.qtd_parcelas - conta.parcela_atual + 1
-                    return total + (conta.valor_parcela * parcelasRestantes)
-                  }, 0))}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {contasAPagar.filter(c => !c.quitado).length} pendentes
+                  Capital investido
                 </p>
               </CardContent>
             </Card>
           </div>
 
-          {/* Cards de Detalhes - Segunda Linha */}
+          {/* Cards Secundários - Estatísticas e Controles */}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            {/* Transações */}
+            <Card className="cursor-pointer hover:shadow-md transition-all duration-200">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total de Transações</CardTitle>
+                <div className="flex items-center gap-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      abrirModalTransacao()
+                    }}
+                    className="h-6 w-6 p-0"
+                  >
+                    <PlusIcon className="h-3 w-3" />
+                  </Button>
+                  <FileTextIcon className="h-4 w-4 text-blue-600" />
+                </div>
+              </CardHeader>
+              <CardContent onClick={() => abrirSidebar('transacoes')}>
+                <div className="text-2xl font-bold text-blue-600">
+                  {(transacoes || []).length}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Movimentações
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Contas a Pagar */}
+            <Card className="cursor-pointer hover:shadow-md transition-all duration-200">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Contas a Pagar</CardTitle>
+                <div className="flex items-center gap-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setModalContaAberto(true)
+                    }}
+                    className="h-6 w-6 p-0"
+                  >
+                    <PlusIcon className="h-3 w-3" />
+                  </Button>
+                  <AlertTriangleIcon className="h-4 w-4 text-orange-600" />
+                </div>
+              </CardHeader>
+              <CardContent onClick={() => abrirSidebar('contas-a-pagar')}>
+                <div className="text-2xl font-bold text-orange-600">
+                  {formatarMoeda(filtrarContasPorPeriodo(contasAPagar || []).filter(c => !c.quitado).reduce((total, conta) => {
+                    const parcelasRestantes = conta.qtd_parcelas - conta.parcela_atual + 1
+                    return total + (conta.valor_parcela * parcelasRestantes)
+                  }, 0))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {filtrarContasPorPeriodo(contasAPagar || []).filter(c => !c.quitado).length} pendentes
+                </p>
+              </CardContent>
+            </Card>
+
             {/* Contas Vencidas */}
             <Card 
-              className="h-full cursor-pointer hover:shadow-md transition-shadow"
+              className="cursor-pointer hover:shadow-md transition-all duration-200"
               onClick={() => abrirSidebar('contas-vencidas')}
             >
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -991,21 +1396,21 @@ export default function HomePage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-red-600">
-                  {contasAPagar.filter(c => {
+                  {filtrarContasPorPeriodo(contasAPagar || []).filter(c => {
                     const hoje = new Date()
                     const vencimento = new Date(c.data_vencimento)
                     return !c.quitado && vencimento < hoje
                   }).length}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Contas em atraso
+                  Em atraso
                 </p>
               </CardContent>
             </Card>
 
             {/* Próximos Vencimentos */}
             <Card 
-              className="h-full cursor-pointer hover:shadow-md transition-shadow"
+              className="cursor-pointer hover:shadow-md transition-all duration-200"
               onClick={() => abrirSidebar('proximos-vencimentos')}
             >
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -1017,7 +1422,7 @@ export default function HomePage() {
                   {(() => {
                     const hoje = new Date()
                     const proximos7Dias = new Date(hoje.getTime() + 7 * 24 * 60 * 60 * 1000)
-                    const contasProximas = contasAPagar.filter(c => {
+                    const contasProximas = filtrarContasPorPeriodo(contasAPagar || []).filter(c => {
                       const vencimento = new Date(c.data_vencimento)
                       return vencimento >= hoje && vencimento <= proximos7Dias && !c.quitado
                     })
@@ -1025,14 +1430,14 @@ export default function HomePage() {
                   })()}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  A vencer em breve
+                  A vencer
                 </p>
               </CardContent>
             </Card>
 
             {/* Contas Quitadas */}
             <Card 
-              className="h-full cursor-pointer hover:shadow-md transition-shadow"
+              className="cursor-pointer hover:shadow-md transition-all duration-200"
               onClick={() => abrirSidebar('contas-quitadas')}
             >
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -1041,17 +1446,17 @@ export default function HomePage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-green-600">
-                  {contasAPagar.filter(c => c.quitado).length}
+                  {(contasAPagar || []).filter(c => c.quitado).length}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Contas pagas
+                  Pagas
                 </p>
               </CardContent>
             </Card>
 
             {/* Metas */}
             <Card 
-              className="h-full cursor-pointer hover:shadow-md transition-shadow"
+              className="cursor-pointer hover:shadow-md transition-all duration-200"
               onClick={() => abrirSidebar('metas')}
             >
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -1060,48 +1465,10 @@ export default function HomePage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-indigo-600">
-                  {metas.length}
+                  {(metas || []).length}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Objetivos ativos
-                </p>
-              </CardContent>
-            </Card>
-
-            {/* Categorias */}
-            <Card 
-              className="h-full cursor-pointer hover:shadow-md transition-shadow"
-              onClick={() => abrirSidebar('categorias')}
-            >
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Categorias</CardTitle>
-                <Building className="h-4 w-4 text-gray-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-gray-600">
-                  {categorias.length > 0 ? categorias.length : 8}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Tipos cadastrados
-                </p>
-              </CardContent>
-            </Card>
-
-            {/* Contas Bancárias */}
-            <Card 
-              className="h-full cursor-pointer hover:shadow-md transition-shadow"
-              onClick={() => abrirSidebar('contas-bancarias')}
-            >
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Contas</CardTitle>
-                <Building className="h-4 w-4 text-blue-700" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-blue-700">
-                  {contasBancarias.length}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Contas bancárias
+                  Objetivos
                 </p>
               </CardContent>
             </Card>
@@ -1112,9 +1479,9 @@ export default function HomePage() {
             <CardHeader>
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                  <CardTitle>Transações Recentes</CardTitle>
+                  <CardTitle>Transações - {getNomePeriodo()}</CardTitle>
                   <CardDescription>
-                    Suas últimas movimentações financeiras
+                    Movimentações financeiras do período selecionado
                   </CardDescription>
                 </div>
                 <div className="flex gap-2">
@@ -1164,7 +1531,7 @@ export default function HomePage() {
                   {transacoesFiltradas.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={5} className="text-center py-8 text-gray-500 dark:text-gray-400">
-                        Nenhuma transação encontrada. Adicione   para visualizá-las aqui.
+                        Nenhuma transação encontrada. Adicione transações para visualizá-las aqui.
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -1218,37 +1585,75 @@ export default function HomePage() {
           </Card>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Investimentos */}
+            {/* Carteira de Investimentos */}
             <Card>
               <CardHeader>
-                <CardTitle>Meus Investimentos</CardTitle>
+                <CardTitle>Carteira de Investimentos</CardTitle>
                 <CardDescription>
-                  Portfolio de investimentos atual
+                  Visão detalhada dos seus investimentos
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {investimentosExibir.length === 0 ? (
+                  {transacoesFiltradaPorPeriodo.filter(t => t.tipo === 'investimento').length === 0 ? (
                     <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                      <p>Nenhum investimento encontrado.</p>
-                      <p className="text-sm">Adicione investimentos ao seu banco de dados para visualizá-los aqui.</p>
+                      <p>Nenhum investimento encontrado no período selecionado.</p>
+                      <p className="text-sm">Adicione investimentos para visualizá-los aqui.</p>
                     </div>
                   ) : (
-                    investimentosExibir.map((investimento: Investimento, index: number) => (
-                      <div key={`${investimento.usuario_id}-${index}`} className="flex items-center justify-between p-4 border rounded-lg">
-                        <div className="space-y-1">
-                          <p className="font-medium">{investimento.nome_investimento}</p>
-                          <p className="text-sm text-muted-foreground">{investimento.tipo}</p>
-                          <p className="text-sm text-blue-600">Rendimento: {investimento.rendimento}%</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-bold">{formatarMoeda(investimento.valor_investimento)}</p>
-                          <p className="text-xs text-muted-foreground">
-                            Aplicado em: {new Date(investimento.data_aplicacao).toLocaleDateString('pt-BR')}
-                          </p>
+                    <div className="space-y-3">
+                      {/* Resumo Total */}
+                      <div className="bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 p-4 rounded-lg">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h3 className="font-semibold text-lg">Total Investido</h3>
+                            <p className="text-sm text-muted-foreground">No período: {getNomePeriodo()}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                              {formatarMoeda(totalInvestimentos)}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {transacoesFiltradaPorPeriodo.filter(t => t.tipo === 'investimento').length} investimentos
+                            </p>
+                          </div>
                         </div>
                       </div>
-                    ))
+
+                      {/* Lista de Investimentos */}
+                      <div className="space-y-2">
+                        <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
+                          Investimentos Recentes
+                        </h4>
+                        {transacoesFiltradaPorPeriodo
+                          .filter(t => t.tipo === 'investimento')
+                          .slice(0, 5)
+                          .map((investimento) => (
+                            <div key={investimento.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                              <div className="flex-1">
+                                <p className="font-medium">{investimento.descricao}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {new Date(investimento.data_transacao).toLocaleDateString('pt-BR')}
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <p className="font-bold text-green-600 dark:text-green-400">
+                                  {formatarMoeda(investimento.valor)}
+                                </p>
+                              </div>
+                            </div>
+                          ))
+                        }
+                        
+                        {transacoesFiltradaPorPeriodo.filter(t => t.tipo === 'investimento').length > 5 && (
+                          <div className="text-center pt-2">
+                            <p className="text-sm text-muted-foreground">
+                              +{transacoesFiltradaPorPeriodo.filter(t => t.tipo === 'investimento').length - 5} investimentos adicionais
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   )}
                 </div>
               </CardContent>
@@ -1310,12 +1715,315 @@ export default function HomePage() {
         </div>
       </div>
 
+      {/* Seção de Gráficos - Análise de Despesas */}
+      <div className="p-6">
+        <div className="mx-auto max-w-7xl">
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Análise de Despesas</h2>
+            <p className="text-gray-600 dark:text-gray-300 mt-1">
+              Visualização detalhada das suas despesas - {getNomePeriodo()}
+            </p>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Gráfico de Pizza - Despesas por Categoria */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Despesas por Categoria</CardTitle>
+                <CardDescription>
+                  Distribuição percentual das suas despesas
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-80">
+                  {(() => {
+                    const despesas = transacoesFiltradaPorPeriodo.filter(t => t.tipo === 'despesa')
+                    if (despesas.length === 0) {
+                      return (
+                        <div className="flex items-center justify-center h-full text-gray-500 dark:text-gray-400">
+                          <div className="text-center">
+                            <p className="text-lg font-medium">Nenhuma despesa encontrada</p>
+                            <p className="text-sm">No período: {getNomePeriodo()}</p>
+                          </div>
+                        </div>
+                      )
+                    }
+                    
+                    const despesasPorCategoria = despesas.reduce((acc, transacao) => {
+                      const categoria = categorias.find(c => c.id === transacao.categoria_id)
+                      const nomeCategoria = categoria?.nome || 'Sem categoria'
+                      acc[nomeCategoria] = (acc[nomeCategoria] || 0) + transacao.valor
+                      return acc
+                    }, {} as Record<string, number>)
+                    
+                    const cores = ['#8B5CF6', '#06B6D4', '#10B981', '#F59E0B', '#EF4444', '#EC4899', '#6366F1', '#84CC16']
+                    const dados = Object.entries(despesasPorCategoria)
+                      .sort(([,a], [,b]) => b - a)
+                      .slice(0, 8)
+                    
+                    const total = dados.reduce((sum, [,valor]) => sum + valor, 0)
+                    
+                    // Função para criar os arcos do gráfico de pizza
+                    const criarArcosPizza = (dados: [string, number][], total: number) => {
+                      let anguloAcumulado = 0
+                      return dados.map(([categoria, valor], index) => {
+                        const percentual = valor / total
+                        const angulo = percentual * 360
+                        const anguloInicial = anguloAcumulado
+                        const anguloFinal = anguloAcumulado + angulo
+                        anguloAcumulado += angulo
+                        
+                        // Converter ângulos para radianos
+                        const inicialRad = (anguloInicial * Math.PI) / 180
+                        const finalRad = (anguloFinal * Math.PI) / 180
+                        
+                        // Calcular pontos do arco
+                        const raio = 80
+                        const centroX = 100
+                        const centroY = 100
+                        
+                        const x1 = centroX + raio * Math.cos(inicialRad)
+                        const y1 = centroY + raio * Math.sin(inicialRad)
+                        const x2 = centroX + raio * Math.cos(finalRad)
+                        const y2 = centroY + raio * Math.sin(finalRad)
+                        
+                        const arcoGrande = angulo > 180 ? 1 : 0
+                        
+                        const path = [
+                          `M ${centroX} ${centroY}`,
+                          `L ${x1} ${y1}`,
+                          `A ${raio} ${raio} 0 ${arcoGrande} 1 ${x2} ${y2}`,
+                          'Z'
+                        ].join(' ')
+                        
+                        return {
+                          path,
+                          cor: cores[index],
+                          categoria,
+                          valor,
+                          percentual: (percentual * 100).toFixed(1)
+                        }
+                      })
+                    }
+                    
+                    const arcos = criarArcosPizza(dados, total)
+                    
+                    return (
+                      <div className="h-full flex flex-col">
+                        {/* Resumo total */}
+                        <div className="text-center mb-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                          <p className="text-sm text-muted-foreground">Total em Despesas</p>
+                          <p className="text-2xl font-bold text-red-600 dark:text-red-400">
+                            {formatarMoeda(total)}
+                          </p>
+                        </div>
+                        
+                        <div className="flex-1 flex gap-6">
+                          {/* Gráfico de Pizza SVG */}
+                          <div className="flex-shrink-0">
+                            <svg width="200" height="200" viewBox="0 0 200 200" className="drop-shadow-sm">
+                              {arcos.map((arco, index) => (
+                                <g key={arco.categoria}>
+                                  <path
+                                    d={arco.path}
+                                    fill={arco.cor}
+                                    stroke="white"
+                                    strokeWidth="2"
+                                    className="hover:opacity-80 transition-opacity cursor-pointer"
+                                    style={{ 
+                                      filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))'
+                                    }}
+                                  />
+                                </g>
+                              ))}
+                              {/* Círculo central para dar efeito de donut */}
+                              <circle
+                                cx="100"
+                                cy="100"
+                                r="25"
+                                fill="white"
+                                className="dark:fill-gray-800"
+                              />
+                              <text
+                                x="100"
+                                y="95"
+                                textAnchor="middle"
+                                className="text-xs font-medium fill-gray-600 dark:fill-gray-300"
+                              >
+                                Despesas
+                              </text>
+                              <text
+                                x="100"
+                                y="110"
+                                textAnchor="middle"
+                                className="text-xs font-bold fill-gray-800 dark:fill-gray-200"
+                              >
+                                {dados.length}
+                              </text>
+                            </svg>
+                          </div>
+                          
+                          {/* Legenda */}
+                          <div className="flex-1 space-y-2 max-h-64 overflow-y-auto">
+                            {arcos.map((arco, index) => (
+                              <div key={arco.categoria} className="flex items-center justify-between p-2 rounded hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                                <div className="flex items-center gap-3 flex-1 min-w-0">
+                                  <div 
+                                    className="w-4 h-4 rounded-full flex-shrink-0"
+                                    style={{ backgroundColor: arco.cor }}
+                                  />
+                                  <div className="min-w-0 flex-1">
+                                    <div className="font-medium text-sm truncate">{arco.categoria}</div>
+                                    <div className="text-xs text-muted-foreground">
+                                      {arco.percentual}% do total
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="text-right flex-shrink-0">
+                                  <div className="font-bold text-sm">{formatarMoeda(arco.valor)}</div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })()}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Gráfico de Coluna - Despesas Recorrentes */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Despesas Recorrentes</CardTitle>
+                <CardDescription>
+                  Despesas que se repetem com maior frequência
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-80">
+                  {(() => {
+                    const despesas = transacoesFiltradaPorPeriodo.filter(t => t.tipo === 'despesa')
+                    if (despesas.length === 0) {
+                      return (
+                        <div className="flex items-center justify-center h-full text-gray-500 dark:text-gray-400">
+                          <div className="text-center">
+                            <p className="text-lg font-medium">Nenhuma despesa encontrada</p>
+                            <p className="text-sm">No período: {getNomePeriodo()}</p>
+                          </div>
+                        </div>
+                      )
+                    }
+                    
+                    // Contar frequência por descrição (despesas similares)
+                    const despesasRecorrentes = despesas.reduce((acc, transacao) => {
+                      const chave = transacao.descricao.toLowerCase().trim()
+                      if (!acc[chave]) {
+                        acc[chave] = { 
+                          descricao: transacao.descricao, 
+                          count: 0, 
+                          valorTotal: 0,
+                          categoria: categorias.find(c => c.id === transacao.categoria_id)?.nome || 'Sem categoria'
+                        }
+                      }
+                      acc[chave].count++
+                      acc[chave].valorTotal += transacao.valor
+                      return acc
+                    }, {} as Record<string, { descricao: string, count: number, valorTotal: number, categoria: string }>)
+                    
+                    // Filtrar apenas recorrentes (aparecem mais de 1 vez) e ordenar
+                    const recorrentes = Object.values(despesasRecorrentes)
+                      .filter(item => item.count > 1)
+                      .sort((a, b) => b.count - a.count)
+                      .slice(0, 6)
+                    
+                    if (recorrentes.length === 0) {
+                      return (
+                        <div className="flex items-center justify-center h-full text-gray-500 dark:text-gray-400">
+                          <div className="text-center">
+                            <p className="text-lg font-medium">Nenhuma despesa recorrente</p>
+                            <p className="text-sm">Despesas que aparecem apenas uma vez no período</p>
+                          </div>
+                        </div>
+                      )
+                    }
+                    
+                    const maxCount = recorrentes[0]?.count || 1
+                    
+                    return (
+                      <div className="h-full flex flex-col">
+                        {/* Título da análise */}
+                        <div className="text-center mb-4 p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                          <p className="text-sm text-muted-foreground">Despesas que mais se repetem</p>
+                          <p className="text-lg font-bold text-orange-600 dark:text-orange-400">
+                            {recorrentes.length} despesas recorrentes
+                          </p>
+                        </div>
+                        
+                        {/* Gráfico de barras */}
+                        <div className="space-y-3 flex-1">
+                          {recorrentes.map((item, index) => {
+                            const altura = Math.max((item.count / maxCount) * 100, 15)
+                            const valorMedio = item.valorTotal / item.count
+                            
+                            return (
+                              <div key={item.descricao} className="space-y-2">
+                                <div className="flex justify-between items-center">
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-medium text-sm truncate" title={item.descricao}>
+                                      {item.descricao}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {item.categoria}
+                                    </p>
+                                  </div>
+                                  <div className="text-right ml-2">
+                                    <p className="font-bold text-sm">{item.count}x</p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {formatarMoeda(valorMedio)}/vez
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="flex items-end gap-2">
+                                  <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-6 relative overflow-hidden">
+                                    <div 
+                                      className="bg-gradient-to-r from-orange-500 to-red-500 h-full rounded-full transition-all duration-500 flex items-center justify-end pr-2"
+                                      style={{ width: `${altura}%` }}
+                                    >
+                                      <span className="text-white text-xs font-medium">
+                                        {item.count}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <div className="text-xs text-muted-foreground min-w-fit">
+                                    Total: {formatarMoeda(item.valorTotal)}
+                                  </div>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )
+                  })()}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+
       {/* Modal de Transação */}
-      <Dialog open={modalTransacaoAberto} onOpenChange={setModalTransacaoAberto}>
+      <Dialog 
+        open={modalTransacaoAberto} 
+        onOpenChange={setModalTransacaoAberto}
+        modal={true}
+      >
         <DialogContent 
-          className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto"
+          className="!fixed !inset-0 !left-0 !top-0 !w-screen !h-screen !max-w-none !max-h-none !m-0 !translate-x-0 !translate-y-0 !rounded-none !border-0 overflow-y-auto z-50"
           onOpenAutoFocus={(e) => e.preventDefault()}
           onCloseAutoFocus={(e) => e.preventDefault()}
+          aria-describedby={undefined}
         >
           <DialogHeader>
             <DialogTitle>
@@ -1343,6 +2051,13 @@ export default function HomePage() {
                     setFormTransacao(prev => ({ 
                       ...prev, 
                       categoria: '13', // ID 13 para transferências
+                      tipo: value as any 
+                    }))
+                  } else if (value === 'investimento') {
+                    // Para investimentos, definir categoria automaticamente (ID 12)
+                    setFormTransacao(prev => ({ 
+                      ...prev, 
+                      categoria: '12', // ID 12 para investimentos
                       tipo: value as any 
                     }))
                   } else {
@@ -1395,6 +2110,18 @@ export default function HomePage() {
                     </div>
                   </div>
                 </div>
+              ) : formTransacao.tipo === 'investimento' ? (
+                // Para investimentos, categoria é automática (ID 12)
+                <div className="space-y-2">
+                  <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-md">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                      <span className="text-sm font-medium text-green-800 dark:text-green-200">
+                        Investimento
+                      </span>
+                    </div>
+                  </div>
+                </div>
               ) : (
                 // Para outros tipos, seleção manual
                 <Select
@@ -1434,7 +2161,7 @@ export default function HomePage() {
                   </SelectContent>
                 </Select>
               )}
-              {formTransacao.tipo && formTransacao.tipo !== 'transferencia' && (
+              {formTransacao.tipo && formTransacao.tipo !== 'transferencia' && formTransacao.tipo !== 'investimento' && (
                 <p className="text-sm text-muted-foreground">
                 </p>
               )}
@@ -1743,12 +2470,17 @@ export default function HomePage() {
       </Dialog>
 
       {/* Sidebar de Detalhes */}
-      <Sheet open={sidebarAberta} onOpenChange={setSidebarAberta}>
+      <Sheet 
+        open={sidebarAberta} 
+        onOpenChange={setSidebarAberta}
+        modal={true}
+      >
         <SheetContent 
           side="right" 
-          className="w-[400px] sm:w-[500px] overflow-y-auto"
+          className="!fixed !inset-0 !left-0 !top-0 !w-screen !h-screen !max-w-none !max-h-none !m-0 !translate-x-0 !translate-y-0 !rounded-none !border-0 overflow-y-auto z-50"
           onOpenAutoFocus={(e) => e.preventDefault()}
           onCloseAutoFocus={(e) => e.preventDefault()}
+          aria-describedby={undefined}
         >
           <SheetHeader>
             <SheetTitle>
@@ -1837,14 +2569,14 @@ export default function HomePage() {
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <h3 className="text-lg font-semibold">Receitas Registradas</h3>
-                  <Button onClick={() => abrirModalTransacao()}>
+                  <Button onClick={() => abrirModalTransacao(undefined, 'entrada')}>
                     <PlusIcon className="h-4 w-4 mr-2" />
                     Adicionar
                   </Button>
                 </div>
                 
                 <div className="space-y-2">
-                  {transacoes
+                  {transacoesFiltradaPorPeriodo
                     .filter(t => t.tipo === 'entrada')
                     .sort((a, b) => new Date(b.data_transacao).getTime() - new Date(a.data_transacao).getTime())
                     .map(transacao => (
@@ -1882,14 +2614,14 @@ export default function HomePage() {
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <h3 className="text-lg font-semibold">Despesas Registradas</h3>
-                  <Button onClick={() => abrirModalTransacao()}>
+                  <Button onClick={() => abrirModalTransacao(undefined, 'despesa')}>
                     <PlusIcon className="h-4 w-4 mr-2" />
                     Adicionar
                   </Button>
                 </div>
                 
                 <div className="space-y-2">
-                  {transacoes
+                  {transacoesFiltradaPorPeriodo
                     .filter(t => t.tipo === 'despesa')
                     .sort((a, b) => new Date(b.data_transacao).getTime() - new Date(a.data_transacao).getTime())
                     .map(transacao => (
@@ -2134,50 +2866,110 @@ export default function HomePage() {
             {/* Contas a Pagar */}
             {tipoSidebarAtivo === 'contas-a-pagar' && (
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Contas Pendentes</h3>
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-semibold">Contas a Pagar</h3>
+                  <div className="flex gap-2">
+                    <Button onClick={() => abrirModalConta()}>
+                      <PlusIcon className="h-4 w-4 mr-2" />
+                      Adicionar
+                    </Button>
+                  </div>
+                </div>
                 
                 <div className="space-y-3">
-                  {contasAPagar
-                    .filter(c => !c.quitado)
-                    .sort((a, b) => new Date(a.data_vencimento).getTime() - new Date(b.data_vencimento).getTime())
-                    .map(conta => {
-                      const hoje = new Date()
-                      const vencimento = new Date(conta.data_vencimento)
-                      const isVencida = vencimento < hoje
-                      const diasRestantes = Math.ceil((vencimento.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24))
-                      
-                      return (
-                        <Card key={conta.id} className={`p-4 ${isVencida ? 'border-red-200 bg-red-50 dark:bg-red-900/20' : ''}`}>
-                          <div className="space-y-2">
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <p className="font-medium">{conta.descricao}</p>
-                                <p className="text-sm text-muted-foreground">
-                                  Parcela {conta.parcela_atual} de {conta.qtd_parcelas}
-                                </p>
+                  
+                  {contasLoading ? (
+                    <Card className="p-8 text-center">
+                      <p className="text-gray-500 dark:text-gray-400">
+                        Carregando contas...
+                      </p>
+                    </Card>
+                  ) : contasError ? (
+                    <Card className="p-8 text-center">
+                      <p className="text-red-500">
+                        Erro: {contasError}
+                      </p>
+                    </Card>
+                  ) : filtrarContasPorPeriodo(contasAPagar || []).length === 0 ? (
+                    <Card className="p-8 text-center">
+                      <p className="text-gray-500 dark:text-gray-400">
+                        Nenhuma conta a pagar encontrada para {getNomePeriodo().toLowerCase()}.
+                      </p>
+                      <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
+                        Tente alterar o período ou adicionar uma nova conta.
+                      </p>
+                    </Card>
+                  ) : (
+                    filtrarContasPorPeriodo(contasAPagar || [])
+                      .sort((a, b) => new Date(a.data_vencimento).getTime() - new Date(b.data_vencimento).getTime())
+                      .map(conta => {
+                        const hoje = new Date()
+                        const vencimento = new Date(conta.data_vencimento)
+                        const isVencida = vencimento < hoje && !conta.quitado
+                        const diasRestantes = Math.ceil((vencimento.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24))
+                        
+                        return (
+                          <Card key={conta.id} className={`p-4 ${
+                            conta.quitado 
+                              ? 'border-green-200 bg-green-50 dark:bg-green-900/20' 
+                              : isVencida 
+                                ? 'border-red-200 bg-red-50 dark:bg-red-900/20' 
+                                : ''
+                          }`}>
+                            <div className="space-y-2">
+                              <div className="flex justify-between items-start">
+                                <div className="flex-1">
+                                  <p className="font-medium">{conta.descricao}</p>
+                                  <p className="text-sm text-muted-foreground">
+                                    Parcela {conta.parcela_atual} de {conta.qtd_parcelas}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    Vencimento: {vencimento.toLocaleDateString('pt-BR')}
+                                  </p>
+                                </div>
+                                <div className="text-right">
+                                  <p className="font-bold text-orange-600">
+                                    {formatarMoeda(conta.valor_parcela)}
+                                  </p>
+                                  {conta.quitado ? (
+                                    <Badge variant="default" className="text-xs bg-green-600">
+                                      Quitada
+                                    </Badge>
+                                  ) : isVencida ? (
+                                    <Badge variant="destructive" className="text-xs">
+                                      Vencida
+                                    </Badge>
+                                  ) : diasRestantes <= 7 ? (
+                                    <Badge variant="secondary" className="text-xs">
+                                      {diasRestantes} dias
+                                    </Badge>
+                                  ) : null}
+                                </div>
                               </div>
-                              <div className="text-right">
-                                <p className="font-bold text-orange-600">
-                                  {formatarMoeda(conta.valor_parcela)}
-                                </p>
-                                {isVencida ? (
-                                  <Badge variant="destructive" className="text-xs">
-                                    Vencida
-                                  </Badge>
-                                ) : diasRestantes <= 7 ? (
-                                  <Badge variant="secondary" className="text-xs">
-                                    {diasRestantes} dias
-                                  </Badge>
-                                ) : null}
+                              <div className="flex gap-1 pt-2">
+                                <Button 
+                                  size="sm" 
+                                  variant="outline" 
+                                  onClick={() => abrirModalConta(conta)}
+                                  className="flex-1"
+                                >
+                                  <EditIcon className="h-3 w-3 mr-1" />
+                                  Editar
+                                </Button>
+                                <Button 
+                                  size="sm" 
+                                  variant="outline" 
+                                  onClick={() => conta.id && handleDeleteConta(conta.id)}
+                                  className="text-red-600 hover:text-red-700"
+                                >
+                                  <TrashIcon className="h-3 w-3" />
+                                </Button>
                               </div>
                             </div>
-                            <div className="text-sm text-muted-foreground">
-                              Vencimento: {vencimento.toLocaleDateString('pt-BR')}
-                            </div>
-                          </div>
-                        </Card>
-                      )
-                    })}
+                          </Card>
+                        )
+                      })
+                  )}
                 </div>
               </div>
             )}
@@ -2194,7 +2986,7 @@ export default function HomePage() {
                 </div>
                 
                 <div className="space-y-2">
-                  {transacoes
+                  {transacoesFiltradaPorPeriodo
                     .sort((a, b) => new Date(b.data_transacao).getTime() - new Date(a.data_transacao).getTime())
                     .map(transacao => (
                       <Card key={transacao.id} className="p-3">
@@ -2498,7 +3290,7 @@ export default function HomePage() {
       {/* Modal para adicionar/editar meta */}
       <Dialog open={modalMetaAberto} onOpenChange={setModalMetaAberto}>
         <DialogContent 
-          className="max-w-md max-h-[85vh] overflow-hidden flex flex-col"
+          className="!fixed !inset-0 !left-0 !top-0 !w-screen !h-screen !max-w-none !max-h-none !m-0 !translate-x-0 !translate-y-0 !rounded-none !border-0 overflow-y-auto flex flex-col z-50"
           onOpenAutoFocus={(e) => e.preventDefault()}
           onCloseAutoFocus={(e) => e.preventDefault()}
         >
@@ -2638,7 +3430,7 @@ export default function HomePage() {
       {/* Modal para atualizar valor da meta */}
       <Dialog open={modalUpdateValueAberto} onOpenChange={setModalUpdateValueAberto}>
         <DialogContent 
-          className="max-w-sm"
+          className="!fixed !inset-0 !left-0 !top-0 !w-screen !h-screen !max-w-none !max-h-none !m-0 !translate-x-0 !translate-y-0 !rounded-none !border-0 overflow-y-auto z-50"
           onOpenAutoFocus={(e) => e.preventDefault()}
           onCloseAutoFocus={(e) => e.preventDefault()}
         >
@@ -2681,7 +3473,176 @@ export default function HomePage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Modal de Contas a Pagar */}
+      <Dialog 
+        open={modalContaAberto} 
+        onOpenChange={setModalContaAberto}
+        modal={true}
+      >
+        <DialogContent 
+          className="!fixed !inset-0 !left-0 !top-0 !w-screen !h-screen !max-w-none !max-h-none !m-0 !translate-x-0 !translate-y-0 !rounded-none !border-0 overflow-y-auto z-50"
+          onOpenAutoFocus={(e) => e.preventDefault()}
+          onCloseAutoFocus={(e) => e.preventDefault()}
+          aria-describedby={undefined}
+        >
+          <DialogHeader>
+            <DialogTitle>
+              {contaEditando ? 'Editar Conta a Pagar' : 'Nova Conta a Pagar'}
+            </DialogTitle>
+            <DialogDescription>
+              {contaEditando 
+                ? 'Edite os dados da conta abaixo.'
+                : 'Preencha os dados para adicionar uma nova conta a pagar.'
+              }
+            </DialogDescription>
+          </DialogHeader>
+          
+          <form onSubmit={handleSubmitConta} className="space-y-4 pb-4">
+            <div className="space-y-2">
+              <Label htmlFor="descricao">Descrição</Label>
+              <Input
+                id="descricao"
+                name="descricao"
+                value={formConta.descricao}
+                onChange={handleInputContaChange}
+                placeholder="Ex: Financiamento do carro, Cartão de crédito..."
+                required
+                disabled={isLoading}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="conta_bancaria_id">Conta Bancária (Opcional)</Label>
+              <Select
+                value={formConta.conta_bancaria_id}
+                onValueChange={(value) => setFormConta(prev => ({ ...prev, conta_bancaria_id: value }))}
+                disabled={isLoading || contasBancariasLoading}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={
+                    contasBancariasLoading 
+                      ? "Carregando..." 
+                      : contasBancarias.length === 0
+                        ? "Nenhuma conta cadastrada"
+                        : "Selecione uma conta (opcional)"
+                  } />
+                </SelectTrigger>
+                <SelectContent>
+                  {contasBancarias.map(conta => (
+                    <SelectItem key={conta.id} value={conta.id.toString()}>
+                      {conta.nome_conta}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Vincule esta conta a pagar a uma conta bancária específica (opcional)
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="valor_total">Valor Total (R$)</Label>
+                <Input
+                  id="valor_total"
+                  name="valor_total"
+                  type="number"
+                  step="0.01"
+                  value={formConta.valor_total}
+                  onChange={handleInputContaChange}
+                  placeholder="0,00"
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="qtd_parcelas">Quantidade de Parcelas</Label>
+                <Input
+                  id="qtd_parcelas"
+                  name="qtd_parcelas"
+                  type="number"
+                  value={formConta.qtd_parcelas}
+                  onChange={handleInputContaChange}
+                  placeholder="12"
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="data_vencimento">Data de Vencimento</Label>
+              <Input
+                id="data_vencimento"
+                name="data_vencimento"
+                type="date"
+                value={formConta.data_vencimento}
+                onChange={handleInputContaChange}
+                required
+                disabled={isLoading}
+              />
+            </div>
+
+            {contaEditando && (
+              <div className="flex items-center space-x-2">
+                <input
+                  id="quitado"
+                  name="quitado"
+                  type="checkbox"
+                  checked={formConta.quitado}
+                  onChange={handleInputContaChange}
+                  disabled={isLoading}
+                  className="rounded"
+                />
+                <Label htmlFor="quitado">Conta quitada</Label>
+              </div>
+            )}
+
+            {formConta.valor_total && formConta.qtd_parcelas && (
+              <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-md">
+                <p className="text-sm text-gray-600 dark:text-gray-300">
+                  Valor por parcela: <span className="font-semibold">
+                    {formatarMoeda(parseFloat(formConta.valor_total || '0') / parseInt(formConta.qtd_parcelas || '1'))}
+                  </span>
+                </p>
+              </div>
+            )}
+
+            {error && (
+              <Alert>
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+
+            {success && (
+              <Alert>
+                <AlertDescription className="text-green-600">{success}</AlertDescription>
+              </Alert>
+            )}
+
+            <div className="flex justify-end space-x-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={fecharModalConta}
+                disabled={isLoading}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={isLoading}>
+                {isLoading 
+                  ? 'Salvando...' 
+                  : contaEditando 
+                    ? 'Atualizar' 
+                    : 'Adicionar'
+                }
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
-

@@ -1,44 +1,39 @@
-// Interceptar e filtrar logs específicos
+// Supressor de logs - Segurança e Privacidade
 if (typeof window !== 'undefined') {
-  const originalConsoleError = console.error;
-  const originalConsoleWarn = console.warn;
-
-  // Filtrar erros específicos de tabelas não configuradas
-  console.error = (...args: any[]) => {
-    const message = args.join(' ');
-    
-    // Não mostrar erros de tabelas não configuradas
-    if (message.includes('cartoes_usuario') && 
-        (message.includes('does not exist') || message.includes('não existe'))) {
-      return;
-    }
-    
-    originalConsoleError.apply(console, args);
-  };
-
-  // Manter warnings mas filtrar alguns específicos
-  console.warn = (...args: any[]) => {
-    const message = args.join(' ');
-    
-    // Permitir warnings mas filtrar duplicatas
-    if (message.includes('⚠️ Tabela cartoes_usuario não configurada')) {
-      // Só mostra uma vez por sessão
-      if (!(window as any)._cartoesWarningShown) {
-        (window as any)._cartoesWarningShown = true;
-        originalConsoleWarn.apply(console, args);
-      }
-      return;
-    }
-    
-    originalConsoleWarn.apply(console, args);
-  };
-}
-
-// Suprimir todos os logs de console em produção
-if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
+  // Suprimir TODOS os logs do console para proteger informações sensíveis
   console.log = () => {};
-  console.warn = () => {};
   console.info = () => {};
+  console.debug = () => {};
+  console.warn = () => {};
+  console.error = () => {};
+  console.trace = () => {};
+  console.table = () => {};
+  console.group = () => {};
+  console.groupCollapsed = () => {};
+  console.groupEnd = () => {};
+  console.time = () => {};
+  console.timeEnd = () => {};
+  console.timeLog = () => {};
+  console.count = () => {};
+  console.countReset = () => {};
+  console.clear = () => {};
+  console.dir = () => {};
+  console.dirxml = () => {};
+  console.assert = () => {};
+  
+  // Desabilitar debugger statements
+  (window as any).debugger = undefined;
+  
+  // Interceptar e suprimir erros não tratados que possam expor informações
+  window.addEventListener('error', (e) => {
+    e.preventDefault();
+    return false;
+  });
+  
+  window.addEventListener('unhandledrejection', (e) => {
+    e.preventDefault();
+    return false;
+  });
 }
 
 export {};

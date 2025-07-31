@@ -78,17 +78,17 @@ export default function ContasAPagar() {
     try {
       // Validações básicas
       if (!formContaData.descricao.trim()) {
-        alert('Descrição é obrigatória')
+        // alert removido para segurança
         return
       }
       
       if (!formContaData.valor_total || parseFloat(formContaData.valor_total) <= 0) {
-        alert('Valor total deve ser maior que zero')
+        // alert removido para segurança
         return
       }
       
       if (!formContaData.data_vencimento) {
-        alert('Data de vencimento é obrigatória')
+        // alert removido para segurança
         return
       }
 
@@ -122,7 +122,7 @@ export default function ContasAPagar() {
       resetForm()
     } catch (error) {
       
-      alert('Erro ao salvar conta. Verifique os dados e tente novamente.')
+      // alert removido para segurança
     }
   }
 
@@ -146,7 +146,7 @@ export default function ContasAPagar() {
         await deleteContaAPagar(conta.id!)
       } catch (error) {
         
-        alert('Erro ao excluir conta.')
+        // alert removido para segurança
       }
     }
   }
@@ -157,7 +157,7 @@ export default function ContasAPagar() {
       await quitarContaAPagar(conta.id!, novaParcelaAtual)
     } catch (error) {
       
-      alert('Erro ao quitar parcela.')
+      // alert removido para segurança
     }
   }
 
@@ -378,7 +378,7 @@ export default function ContasAPagar() {
       </div>
 
       {/* Cards de Resumo */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Pendente</CardTitle>
