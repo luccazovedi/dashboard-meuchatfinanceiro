@@ -48,7 +48,7 @@ const calcularSaldoAtual = (contaId: number, saldoInicial: number, transacoes: T
   })
 
   return saldoAtual
-}
+
 
 export default function ConfiguracoesPage() {
   const router = useRouter()
@@ -275,6 +275,8 @@ export default function ConfiguracoesPage() {
         ativo: cartao.ativo
       })
     } else {
+        {/* ...existing code... */}
+        {/* ...existing code... */}
       setEditandoCartao(null)
       setFormCartao({
         banco_id: '',
@@ -593,10 +595,8 @@ export default function ConfiguracoesPage() {
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 md:gap-4 px-1 md:px-2">
             <div className="flex items-center gap-3 md:gap-4 w-full sm:w-auto">
               <Button
-                variant="ghost"
-                size="sm"
+                className="btn-ghost btn-sm hover:bg-muted flex-shrink-0"
                 onClick={() => window.history.back()}
-                className="hover:bg-muted flex-shrink-0"
               >
                 <ArrowLeft className="h-4 w-4 mr-1 md:mr-2" />
                 <span className="hidden xs:inline">Voltar</span>
@@ -630,14 +630,6 @@ export default function ConfiguracoesPage() {
               <span className="xs:hidden">Dados</span>
             </TabsTrigger>
             <TabsTrigger 
-              value="contas" 
-              className="flex items-center gap-1 md:gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground text-xs md:text-sm py-2 md:py-2.5"
-            >
-              <Wallet className="h-3 w-3 md:h-4 md:w-4" />
-              <span className="hidden xs:inline">Contas</span>
-              <span className="xs:hidden">Contas</span>
-            </TabsTrigger>
-            <TabsTrigger 
               value="cartoes" 
               className="flex items-center gap-1 md:gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground text-xs md:text-sm py-2 md:py-2.5"
             >
@@ -645,94 +637,62 @@ export default function ConfiguracoesPage() {
               <span className="hidden xs:inline">Cartões</span>
               <span className="xs:hidden">Cartões</span>
             </TabsTrigger>
-          </TabsList>        <TabsContent value="pessoais" className="space-y-4 md:space-y-6 px-0 md:px-1">
-          <Card>
-            <CardHeader className="pb-4 md:pb-6">
-              <CardTitle className="text-lg md:text-xl">Informações Pessoais</CardTitle>
-              <CardDescription className="text-sm">
-                Atualize seus dados pessoais aqui
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4 p-4 md:p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+          </TabsList>
+          <TabsContent value="pessoais" className="space-y-4 md:space-y-6 px-0 md:px-1">
+            <Card>
+              <CardHeader className="pb-4 md:pb-6">
+                <CardTitle className="text-lg md:text-xl">Informações Pessoais</CardTitle>
+                <CardDescription className="text-sm">
+                  Atualize seus dados pessoais aqui
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {/* Conteúdo dos dados pessoais aqui */}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Alterar Senha</CardTitle>
+                <CardDescription>
+                  Altere sua senha de acesso
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4 p-6">
                 <div className="space-y-2">
-                  <Label htmlFor="nome" className="text-sm font-medium">Nome</Label>
+                  <Label htmlFor="senhaAtual">Senha Atual</Label>
                   <Input
-                    id="nome"
-                    value={nome}
-                    onChange={(e) => setNome(e.target.value)}
-                    placeholder="Seu nome completo"
-                    className="h-10"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="text-sm font-medium">Email</Label>
-                  <Input
-                    id="email"
-                    value={email}
-                    disabled
-                    className="bg-muted border-border text-muted-foreground cursor-not-allowed h-10"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="telefone" className="text-sm font-medium">Telefone</Label>
-                  <Input
-                    id="telefone"
-                    value={telefone}
-                    onChange={(e) => setTelefone(e.target.value)}
-                    placeholder="(11) 99999-9999"
-                  />
-                </div>
-              </div>
-              <Button onClick={salvarDadosPessoais} disabled={loading}>
-                {loading ? 'Salvando...' : 'Salvar Dados'}
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Alterar Senha</CardTitle>
-              <CardDescription>
-                Altere sua senha de acesso
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4 p-6">
-              <div className="space-y-2">
-                <Label htmlFor="senhaAtual">Senha Atual</Label>
-                <Input
-                  id="senhaAtual"
-                  type="password"
-                  value={senhaAtual}
-                  onChange={(e) => setSenhaAtual(e.target.value)}
-                />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="novaSenha">Nova Senha</Label>
-                  <Input
-                    id="novaSenha"
+                    id="senhaAtual"
                     type="password"
-                    value={novaSenha}
-                    onChange={(e) => setNovaSenha(e.target.value)}
+                    value={senhaAtual}
+                    onChange={(e) => setSenhaAtual(e.target.value)}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="confirmarSenha">Confirmar Nova Senha</Label>
-                  <Input
-                    id="confirmarSenha"
-                    type="password"
-                    value={confirmarSenha}
-                    onChange={(e) => setConfirmarSenha(e.target.value)}
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="novaSenha">Nova Senha</Label>
+                    <Input
+                      id="novaSenha"
+                      type="password"
+                      value={novaSenha}
+                      onChange={(e) => setNovaSenha(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="confirmarSenha">Confirmar Nova Senha</Label>
+                    <Input
+                      id="confirmarSenha"
+                      type="password"
+                      value={confirmarSenha}
+                      onChange={(e) => setConfirmarSenha(e.target.value)}
+                    />
+                  </div>
                 </div>
-              </div>
-              <Button onClick={alterarSenha} disabled={loading}>
-                {loading ? 'Alterando...' : 'Alterar Senha'}
-              </Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
+                <Button onClick={alterarSenha} disabled={loading}>
+                  {loading ? 'Alterando...' : 'Alterar Senha'}
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
         <TabsContent value="contas" className="space-y-4 md:space-y-6 px-0 md:px-1">
           <Card>
@@ -770,7 +730,7 @@ export default function ConfiguracoesPage() {
                       <Label htmlFor="banco" className="text-sm font-medium">Banco</Label>
                       <Select 
                         value={formConta.banco_id} 
-                        onValueChange={(value) => setFormConta(prev => ({...prev, banco_id: value}))}
+                        onValueChange={(value: any) => setFormConta(prev => ({...prev, banco_id: value}))}
                       >
                         <SelectTrigger className="h-10">
                           <SelectValue placeholder="Selecione o banco" />
@@ -837,7 +797,7 @@ export default function ConfiguracoesPage() {
                       <Switch
                         id="ativo"
                         checked={formConta.ativo}
-                        onCheckedChange={(checked) => setFormConta(prev => ({
+                        onCheckedChange={(checked: any) => setFormConta(prev => ({
                           ...prev, 
                           ativo: checked
                         }))}
@@ -848,7 +808,7 @@ export default function ConfiguracoesPage() {
                     <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-2 sm:space-x-0 pt-4">
                       <Button
                         type="button"
-                        variant="outline"
+                        className="btn-outline"
                         onClick={fecharModalConta}
                         disabled={loading}
                         className="w-full sm:w-auto order-2 sm:order-1"
@@ -883,135 +843,128 @@ export default function ConfiguracoesPage() {
                   {contas.map((conta) => (
                     <div
                       key={conta.id}
-                      className={`p-4 border rounded-lg transition-colors ${
+                      className={`p-4 border rounded-lg transition-colors flex flex-col md:flex-row md:items-center md:justify-between gap-4 ${
                         conta.ativo 
                           ? 'bg-card border-border' 
                           : 'bg-muted/50 border-border opacity-60'
                       }`}
                     >
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <Building2 className="h-4 w-4" />
-                            <span className="font-semibold">
-                              {conta.nome_conta}
-                            </span>
-                            <Badge variant="secondary">
-                              {conta.tipo_conta.charAt(0).toUpperCase() + conta.tipo_conta.slice(1)}
-                            </Badge>
-                            {!conta.ativo && (
-                              <Badge variant="secondary">Inativa</Badge>
+                      <div className="flex flex-col gap-2 min-w-0 md:w-1/2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Building2 className="h-4 w-4" />
+                          <span className="font-semibold truncate max-w-[120px] md:max-w-[180px]">
+                            {conta.nome_conta}
+                          </span>
+                          <span className="px-2 py-1 rounded bg-gray-200 text-xs font-semibold">
+                            {conta.tipo_conta.charAt(0).toUpperCase() + conta.tipo_conta.slice(1)}
+                          </span>
+                          {!conta.ativo && (
+                            <span className="px-2 py-1 rounded bg-gray-300 text-xs font-semibold">Inativa</span>
+                          )}
+                        </div>
+                        <div className="text-sm text-muted-foreground flex flex-wrap gap-2">
+                          <span>Banco: {conta.banco?.nome || 'Banco não encontrado'}</span>
+                          <span>Saldo Inicial: {formatarMoeda(conta.saldo_inicial)}</span>
+                          <span className={`font-medium truncate max-w-[120px] md:max-w-[180px] ${calcularSaldoAtual(conta.id, conta.saldo_inicial, transacoes) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            Saldo Atual: {formatarMoeda(calcularSaldoAtual(conta.id, conta.saldo_inicial, transacoes))}
+                          </span>
+                        </div>
+                        {/* Cartões associados */}
+                        <div className="mt-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <Label className="text-sm font-medium">Cartões associados:</Label>
+                            <div className="flex gap-2">
+                              <Button
+                                className="btn-outline btn-sm"
+                                onClick={() => abrirModalAssociarCartao(conta.id)}
+                                disabled={getCartoesNaoAssociados().length === 0}
+                              >
+                                <Plus className="h-3 w-3 mr-1" />
+                                Associar
+                              </Button>
+                              <Button
+                                className="btn-outline btn-sm"
+                                onClick={() => abrirModalCartaoConta(conta.id)}
+                              >
+                                <Plus className="h-3 w-3 mr-1" />
+                                Novo
+                              </Button>
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            {/* Cartões da tabela cartoes_credito (sistema antigo) */}
+                            {getCartoesPorConta(conta.id).map((cartao) => (
+                              <div key={`credito-${cartao.id}`} className="flex items-center justify-between p-2 bg-muted/50 border border-border rounded">
+                                <div className="text-sm text-foreground">
+                                  <span className="font-medium">Cartão **** {cartao.final_cartao}</span>
+                                  <span className="ml-2 text-xs badge-secondary">Sistema</span>
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  Limite: {formatarMoeda(cartao.limite_credito)}
+                                </div>
+                              </div>
+                            ))}
+                            {/* Cartões da tabela cartoes_usuario associados a esta conta */}
+                            {getCartoesDaConta(conta.id).map((cartao) => (
+                              <div key={`usuario-${cartao.id}`} className="flex items-center justify-between p-3 bg-primary/5 border border-primary/20 rounded-lg">
+                                <div className="text-sm">
+                                  <span className="font-medium text-foreground">Cartão **** {cartao.final_cartao}</span>
+                                  <span className="ml-2 text-xs badge-default">Associado</span>
+                                  <span className="ml-2 text-xs text-muted-foreground">
+                                    {cartao.banco?.nome}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <div className="text-xs text-muted-foreground">
+                                    Limite: {formatarMoeda(cartao.limite)}
+                                  </div>
+                                  <Button
+                                    className="btn-ghost btn-sm text-destructive hover:text-destructive/80 hover:bg-destructive/10 h-6 w-6 p-0"
+                                    onClick={() => handleDesassociarCartao(cartao.id)}
+                                    title="Desassociar cartão"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
+                            {getCartoesPorConta(conta.id).length === 0 && getCartoesDaConta(conta.id).length === 0 && (
+                              <p className="text-sm text-muted-foreground">Nenhum cartão associado</p>
                             )}
                           </div>
-                          <div className="text-sm text-muted-foreground space-y-1">
-                            <p>Banco: {conta.banco?.nome || 'Banco não encontrado'}</p>
-                            <p>Saldo Inicial: {formatarMoeda(conta.saldo_inicial)}</p>
-                            <p className={`font-medium ${calcularSaldoAtual(conta.id, conta.saldo_inicial, transacoes) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                              Saldo Atual: {formatarMoeda(calcularSaldoAtual(conta.id, conta.saldo_inicial, transacoes))}
-                            </p>
-                          </div>
-                          
-                          {/* Cartões associados */}
-                          <div className="mt-3">
-                            <div className="flex items-center justify-between mb-2">
-                              <Label className="text-sm font-medium">Cartões associados:</Label>
-                              <div className="flex gap-2">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => abrirModalAssociarCartao(conta.id)}
-                                  disabled={getCartoesNaoAssociados().length === 0}
-                                >
-                                  <Plus className="h-3 w-3 mr-1" />
-                                  Associar
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => abrirModalCartaoConta(conta.id)}
-                                >
-                                  <Plus className="h-3 w-3 mr-1" />
-                                  Novo
-                                </Button>
-                              </div>
-                            </div>
-                            <div className="space-y-2">
-                              {/* Cartões da tabela cartoes_credito (sistema antigo) */}
-                              {getCartoesPorConta(conta.id).map((cartao) => (
-                                <div key={`credito-${cartao.id}`} className="flex items-center justify-between p-2 bg-muted/50 border border-border rounded">
-                                  <div className="text-sm text-foreground">
-                                    <span className="font-medium">Cartão **** {cartao.final_cartao}</span>
-                                    <Badge variant="secondary" className="ml-2 text-xs">Sistema</Badge>
-                                  </div>
-                                  <div className="text-xs text-muted-foreground">
-                                    Limite: {formatarMoeda(cartao.limite_credito)}
-                                  </div>
-                                </div>
-                              ))}
-                              
-                              {/* Cartões da tabela cartoes_usuario associados a esta conta */}
-                              {getCartoesDaConta(conta.id).map((cartao) => (
-                                <div key={`usuario-${cartao.id}`} className="flex items-center justify-between p-3 bg-primary/5 border border-primary/20 rounded-lg">
-                                  <div className="text-sm">
-                                    <span className="font-medium text-foreground">Cartão **** {cartao.final_cartao}</span>
-                                    <Badge variant="default" className="ml-2 text-xs">Associado</Badge>
-                                    <span className="ml-2 text-xs text-muted-foreground">
-                                      {cartao.banco?.nome}
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <div className="text-xs text-muted-foreground">
-                                      Limite: {formatarMoeda(cartao.limite)}
-                                    </div>
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      onClick={() => handleDesassociarCartao(cartao.id)}
-                                      className="text-destructive hover:text-destructive/80 hover:bg-destructive/10 h-6 w-6 p-0"
-                                      title="Desassociar cartão"
-                                    >
-                                      <X className="h-3 w-3" />
-                                    </Button>
-                                  </div>
-                                </div>
-                              ))}
-                              
-                              {getCartoesPorConta(conta.id).length === 0 && getCartoesDaConta(conta.id).length === 0 && (
-                                <p className="text-sm text-muted-foreground">Nenhum cartão associado</p>
-                              )}
-                            </div>
-                          </div>
                         </div>
-                        
-                        <div className="flex items-center gap-2">
-                          <Switch
-                            checked={conta.ativo}
-                            onCheckedChange={(checked) => 
-                              handleToggleContaAtiva(conta.id, checked)
-                            }
-                          />
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => abrirModalConta(conta)}
-                            className="hover:bg-muted"
-                            title="Editar conta"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleExcluirConta(conta.id)}
-                            className="text-destructive hover:text-destructive/80 hover:bg-destructive/10"
-                            title="Excluir conta"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 md:w-1/2 mt-4 md:mt-0">
+                        <Switch
+                          checked={conta.ativo}
+                          onCheckedChange={(checked: any) => handleToggleContaAtiva(conta.id, checked)}
+                        />
+                        <Button
+                          className="btn-ghost btn-sm hover:bg-muted"
+                          onClick={() => abrirModalConta(conta)}
+                          title="Editar conta"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          className="btn-ghost btn-sm text-destructive hover:text-destructive/80 hover:bg-destructive/10"
+                          onClick={() => handleExcluirConta(conta.id)}
+                          title="Excluir conta"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+              {contas.length === 0 && !loadingContas && (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Wallet className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>Nenhuma conta cadastrada.</p>
+                  <p className="text-sm mt-2">
+                    Clique em "Nova Conta" para adicionar sua primeira conta bancária.
+                  </p>
                 </div>
               )}
               
@@ -1112,7 +1065,7 @@ export default function ConfiguracoesPage() {
                 <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-2 sm:space-x-0 pt-4">
                   <Button
                     type="button"
-                    variant="outline"
+                    className="btn-outline"
                     onClick={fecharModalCartaoConta}
                     disabled={loading}
                     className="w-full sm:w-auto order-2 sm:order-1"
@@ -1173,7 +1126,7 @@ export default function ConfiguracoesPage() {
                           </div>
                         </div>
                         <Button
-                          size="sm"
+                          className="btn-sm"
                           onClick={() => handleAssociarCartao(cartao.id)}
                           disabled={loading}
                           className="flex-shrink-0 w-full sm:w-auto"
@@ -1188,7 +1141,7 @@ export default function ConfiguracoesPage() {
                 <div className="flex justify-end pt-2">
                   <Button
                     type="button"
-                    variant="outline"
+                    className="btn-outline"
                     onClick={fecharModalAssociarCartao}
                     className="w-full sm:w-auto"
                   >
@@ -1236,7 +1189,7 @@ export default function ConfiguracoesPage() {
                       <Label htmlFor="banco_cartao" className="text-sm font-medium">Banco</Label>
                       <Select 
                         value={formCartao.banco_id} 
-                        onValueChange={(value) => setFormCartao(prev => ({...prev, banco_id: value}))}
+                        onValueChange={(value: any) => setFormCartao(prev => ({...prev, banco_id: value}))}
                       >
                         <SelectTrigger className="h-10">
                           <SelectValue placeholder="Selecione o banco" />
@@ -1325,7 +1278,7 @@ export default function ConfiguracoesPage() {
                       <Switch
                         id="ativo"
                         checked={formCartao.ativo}
-                        onCheckedChange={(checked) => setFormCartao(prev => ({
+                        onCheckedChange={(checked: any) => setFormCartao(prev => ({
                           ...prev, 
                           ativo: checked
                         }))}
@@ -1336,7 +1289,7 @@ export default function ConfiguracoesPage() {
                     <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-2 sm:space-x-0 pt-4">
                       <Button
                         type="button"
-                        variant="outline"
+                        className="btn-outline"
                         onClick={fecharModalCartao}
                         disabled={loading}
                         className="w-full sm:w-auto order-2 sm:order-1"
@@ -1387,12 +1340,12 @@ export default function ConfiguracoesPage() {
                               **** {cartao.final_cartao}
                             </span>
                             {cartao.conta_bancaria_id && (
-                              <Badge variant="default" className="text-xs">
+                              <span className="badge-default text-xs">
                                 Associado à Conta
-                              </Badge>
+                              </span>
                             )}
                             {!cartao.ativo && (
-                              <Badge variant="secondary">Inativo</Badge>
+                              <span className="badge-secondary">Inativo</span>
                             )}
                           </div>
                           <div className="text-sm text-muted-foreground space-y-1">
@@ -1410,13 +1363,12 @@ export default function ConfiguracoesPage() {
                         <div className="flex items-center gap-2">
                           <Switch
                             checked={cartao.ativo}
-                            onCheckedChange={(checked) => 
+                            onCheckedChange={(checked: any) =>
                               handleToggleCartaoAtivo(cartao.id, checked)
                             }
                           />
                           <Button
-                            size="sm"
-                            variant="ghost"
+                            className="btn-ghost btn-sm"
                             onClick={() => abrirModalCartao(cartao)}
                             className="hover:bg-muted"
                             title="Editar cartão"
@@ -1424,8 +1376,7 @@ export default function ConfiguracoesPage() {
                             <Edit className="h-4 w-4" />
                           </Button>
                           <Button
-                            size="sm"
-                            variant="ghost"
+                            className="btn-ghost btn-sm"
                             onClick={() => handleExcluirCartao(cartao.id)}
                             className="text-destructive hover:text-destructive/80 hover:bg-destructive/10"
                             title="Excluir cartão"
@@ -1452,104 +1403,7 @@ export default function ConfiguracoesPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="categorias" className="space-y-4 md:space-y-6 px-0 md:px-1">
-          <Card>
-            <CardHeader className="pb-4 md:pb-6">
-              <CardTitle className="text-lg md:text-xl">Categorias Disponíveis</CardTitle>
-              <CardDescription className="text-sm">
-                Categorias disponíveis para suas transações. Você pode personalizar as cores de cada categoria.
-              {/* Categorias fixas, sem opção de alteração */}
-              <Card>
-                <CardHeader className="pb-4 md:pb-6">
-                  <CardTitle className="text-lg md:text-xl">Categorias Disponíveis</CardTitle>
-                  <CardDescription className="text-sm">
-                    Categorias disponíveis para suas transações.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="p-4 md:p-6">
-                  {loadingCategorias ? (
-                    <div className="flex items-center justify-center py-6 md:py-8">
-                      <p className="text-sm">Carregando categorias...</p>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
-                      {categorias.map((categoria) => (
-                        <div
-                          key={categoria.id}
-                          className="p-4 border rounded-lg"
-                        >
-                          <div className="space-y-1">
-                            <div className="font-medium text-foreground text-base">{categoria.nome}</div>
-                            <div className="flex items-center gap-2">
-                              <span className="w-4 h-4 rounded-full" style={{ backgroundColor: categoria.cor_usuario || categoria.cor_padrao }}></span>
-                              <span className="text-xs text-muted-foreground">{categoria.cor_usuario || categoria.cor_padrao}</span>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {categorias.length === 0 && !loadingCategorias && (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <p>Nenhuma categoria disponível.</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-                          </div>
-                          
-                          <div className="flex gap-2">
-                            <Button size="sm" onClick={handleSalvarCorCategoria}>
-                              <Save className="h-3 w-3 mr-1" />
-                              Salvar
-                            </Button>
-                            <Button 
-                              size="sm" 
-                              variant="outline" 
-                              onClick={handleCancelarEdicaoCategoria}
-                            >
-                              <X className="h-3 w-3 mr-1" />
-                              Cancelar
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div
-                              className="w-4 h-4 rounded-full"
-                              style={{ backgroundColor: categoria.cor_usuario || categoria.cor_padrao }}
-                            />
-                            <span className="font-medium">{categoria.nome}</span>
-                          </div>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleEditarCorCategoria(categoria)}
-                          >
-                            <Edit className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-              
-              {categorias.length === 0 && !loadingCategorias && (
-                <div className="text-center py-8 text-muted-foreground">
-                  <p>Nenhuma categoria encontrada.</p>
-                  <p className="text-sm mt-2">
-                    Execute o script SQL fornecido no seu banco Supabase para adicionar as categorias.
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
-      </div>
     </div>
   )
-}
+

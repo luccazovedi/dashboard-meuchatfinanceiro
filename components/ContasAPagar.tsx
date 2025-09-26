@@ -459,6 +459,49 @@ export default function ContasAPagar() {
             <p className="text-xs text-muted-foreground">
               Atenção necessária
             </p>
+            {/* Listar contas vencendo e botão para dar baixa */}
+            <div className="mt-4 space-y-2">
+              {contasVencendo.map((conta) => (
+                <div key={conta.id} className="flex flex-col md:flex-row md:items-center justify-between border rounded p-2 bg-yellow-50">
+                  <div>
+                    <span className="font-medium">{conta.descricao}</span>
+                    <span className="ml-2 text-xs text-muted-foreground">Vencimento: {new Date(conta.data_vencimento).toLocaleDateString('pt-BR')}</span>
+                    <span className="ml-2 text-xs text-muted-foreground">Valor: R$ {conta.valor_parcela.toFixed(2)}</span>
+                  </div>
+                  <form
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      if (!formContaData.conta_bancaria_id) return alert('Selecione um banco para debitar!');
+                      const contaSelecionada = contasBancarias.find(c => c.id.toString() === formContaData.conta_bancaria_id);
+                      if (!contaSelecionada) return alert('Conta não encontrada!');
+                      const saldoAtual = typeof contaSelecionada.saldo_inicial === 'number' ? contaSelecionada.saldo_inicial : 0;
+                      if (saldoAtual < conta.valor_parcela) return alert('Saldo insuficiente na conta selecionada!');
+                      contaSelecionada.saldo_inicial = saldoAtual - conta.valor_parcela;
+                      await quitarContaAPagar(conta.id!, conta.parcela_atual + 1);
+                      alert(`Conta baixada e valor debitado: R$ ${conta.valor_parcela.toFixed(2)}.`);
+                    }}
+                    className="flex gap-2 mt-2 md:mt-0"
+                  >
+                    <Select
+                      value={formContaData.conta_bancaria_id || ''}
+                      onValueChange={(value: string) => setFormContaData({ ...formContaData, conta_bancaria_id: value })}
+                    >
+                      <SelectTrigger className="w-32">
+                        <SelectValue placeholder="Banco" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {contasBancarias.map((cb) => (
+                          <SelectItem key={cb.id} value={cb.id.toString()}>
+                            {cb.nome_conta}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button type="submit" className="bg-green-600 text-white hover:bg-green-700">Dar Baixa</Button>
+                  </form>
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
 
