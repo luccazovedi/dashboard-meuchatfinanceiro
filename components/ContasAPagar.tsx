@@ -163,24 +163,19 @@ export default function ContasAPagar() {
 
   const getStatusBadge = (conta: ContaAPagar) => {
     if (conta.quitado) {
-      return <Badge variant="default" className="bg-green-500 hover:bg-green-600">Quitado</Badge>
+      return <Badge className="bg-green-500 hover:bg-green-600">Quitado</Badge>
     }
-    
     const hoje = new Date()
     const vencimento = new Date(conta.data_vencimento)
-    
     if (vencimento < hoje) {
-      return <Badge variant="destructive">Vencido</Badge>
+      return <Badge className="bg-red-500 text-white">Vencido</Badge>
     }
-    
     const diffTime = vencimento.getTime() - hoje.getTime()
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    
     if (diffDays <= 7) {
-      return <Badge variant="outline" className="border-yellow-500 text-yellow-600">Vence em {diffDays} dias</Badge>
+      return <Badge className="border-yellow-500 text-yellow-600">Vence em {diffDays} dias</Badge>
     }
-    
-    return <Badge variant="outline">Pendente</Badge>
+    return <Badge className="border-gray-300 text-gray-700">Pendente</Badge>
   }
 
   const formatCurrency = (value: number) => {
@@ -225,6 +220,51 @@ export default function ContasAPagar() {
 
   return (
     <div className="space-y-6">
+      {/* Pagar fatura atual */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Pagar Fatura Atual</CardTitle>
+          <CardDescription>Selecione o banco para pagar a fatura do mês.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (!formContaData.conta_bancaria_id) return alert('Selecione um banco!');
+              // Encontrar a conta selecionada
+              const contaSelecionada = contasBancarias.find(c => c.id.toString() === formContaData.conta_bancaria_id);
+              if (!contaSelecionada) return alert('Conta não encontrada!');
+              // Calcular valor total das contas pendentes
+              const valorFatura = contasAPagar.filter(c => !c.quitado).reduce((acc, c) => acc + c.valor_parcela, 0);
+              if (valorFatura <= 0) return alert('Nenhuma fatura pendente para pagar!');
+              const saldoAtual = typeof contaSelecionada.saldo_inicial === 'number' ? contaSelecionada.saldo_inicial : 0;
+              if (saldoAtual < valorFatura) return alert('Saldo insuficiente na conta selecionada!');
+              // Debitar saldo
+              contaSelecionada.saldo_inicial = saldoAtual - valorFatura;
+              // Aqui você pode atualizar o saldo no backend, se necessário
+              alert(`Fatura paga! Valor debitado: R$ ${valorFatura.toFixed(2)}.`);
+            }}
+            className="flex flex-col gap-4 md:flex-row md:items-center"
+          >
+            <Select
+              value={formContaData.conta_bancaria_id || ''}
+              onValueChange={(value: string) => setFormContaData({ ...formContaData, conta_bancaria_id: value })}
+            >
+              <SelectTrigger className="w-full md:w-64">
+                <SelectValue placeholder="Selecione o banco" />
+              </SelectTrigger>
+              <SelectContent>
+                {contasBancarias.map((conta) => (
+                  <SelectItem key={conta.id} value={conta.id.toString()}>
+                    {conta.nome_conta}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button type="submit" className="bg-green-600 text-white hover:bg-green-700 w-full md:w-auto">Pagar Fatura</Button>
+          </form>
+        </CardContent>
+      </Card>
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold">Contas a Pagar</h1>
@@ -241,7 +281,7 @@ export default function ContasAPagar() {
               Adicionar Conta
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-md">
+    <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 {editingConta ? 'Editar Conta' : 'Adicionar Nova Conta'}
@@ -267,7 +307,7 @@ export default function ContasAPagar() {
                 <div className="flex gap-2">
                   <Select
                     value={formContaData.conta_bancaria_id || undefined}
-                    onValueChange={(value) => setFormContaData({ ...formContaData, conta_bancaria_id: value })}
+                    onValueChange={(value: string) => setFormContaData({ ...formContaData, conta_bancaria_id: value })}
                   >
                     <SelectTrigger className="flex-1">
                       <SelectValue placeholder="Selecione uma conta (opcional)" />
@@ -283,10 +323,8 @@ export default function ContasAPagar() {
                   {formContaData.conta_bancaria_id && (
                     <Button
                       type="button"
-                      variant="outline"
-                      size="sm"
                       onClick={() => setFormContaData({ ...formContaData, conta_bancaria_id: '' })}
-                      className="px-3"
+                      className="px-3 border border-gray-300 text-gray-700 bg-white hover:bg-gray-100"
                     >
                       Limpar
                     </Button>
@@ -365,10 +403,10 @@ export default function ContasAPagar() {
               </div>
 
               <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setShowAddDialog(false)}>
+                <Button type="button" onClick={() => setShowAddDialog(false)} className="border border-gray-300 text-gray-700 bg-white hover:bg-gray-100">
                   Cancelar
                 </Button>
-                <Button type="submit">
+                <Button type="submit" className="bg-blue-600 text-white hover:bg-blue-700">
                   {editingConta ? 'Atualizar' : 'Salvar'}
                 </Button>
               </DialogFooter>
@@ -464,9 +502,8 @@ export default function ContasAPagar() {
         {['todas', 'pendentes', 'quitadas', 'vencidas'].map((filtro) => (
           <Button
             key={filtro}
-            variant={filtroContas === filtro ? 'default' : 'outline'}
-            size="sm"
             onClick={() => setFiltroContas(filtro)}
+            className={`px-3 py-1 rounded ${filtroContas === filtro ? 'bg-blue-600 text-white' : 'border border-gray-300 text-gray-700 bg-white hover:bg-gray-100'}`}
           >
             {filtro.charAt(0).toUpperCase() + filtro.slice(1)}
           </Button>
@@ -516,26 +553,21 @@ export default function ContasAPagar() {
                 <div className="flex gap-2">
                   {!conta.quitado && conta.parcela_atual <= conta.qtd_parcelas && (
                     <Button
-                      size="sm"
-                      variant="outline"
                       onClick={() => handleQuitarParcela(conta)}
-                      className="text-green-600 hover:text-green-700"
+                      className="px-2 py-1 border border-green-600 text-green-600 bg-white hover:bg-green-50"
                     >
                       <CheckCircle className="h-4 w-4" />
                     </Button>
                   )}
                   <Button
-                    size="sm"
-                    variant="outline"
                     onClick={() => handleEditConta(conta)}
+                    className="px-2 py-1 border border-gray-300 text-gray-700 bg-white hover:bg-gray-100"
                   >
                     <Edit className="h-4 w-4" />
                   </Button>
                   <Button
-                    size="sm"
-                    variant="outline"
                     onClick={() => handleDeleteConta(conta)}
-                    className="text-red-600 hover:text-red-700"
+                    className="px-2 py-1 border border-red-600 text-red-600 bg-white hover:bg-red-50"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>

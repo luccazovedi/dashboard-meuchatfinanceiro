@@ -645,14 +645,6 @@ export default function ConfiguracoesPage() {
               <span className="hidden xs:inline">Cartões</span>
               <span className="xs:hidden">Cartões</span>
             </TabsTrigger>
-            <TabsTrigger 
-              value="categorias" 
-              className="flex items-center gap-1 md:gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground text-xs md:text-sm py-2 md:py-2.5"
-            >
-              <Tags className="h-3 w-3 md:h-4 md:w-4" />
-              <span className="hidden xs:inline">Categorias</span>
-              <span className="xs:hidden">Categorias</span>
-            </TabsTrigger>
           </TabsList>        <TabsContent value="pessoais" className="space-y-4 md:space-y-6 px-0 md:px-1">
           <Card>
             <CardHeader className="pb-4 md:pb-6">
@@ -1466,44 +1458,45 @@ export default function ConfiguracoesPage() {
               <CardTitle className="text-lg md:text-xl">Categorias Disponíveis</CardTitle>
               <CardDescription className="text-sm">
                 Categorias disponíveis para suas transações. Você pode personalizar as cores de cada categoria.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-4 md:p-6">
-              {loadingCategorias ? (
-                <div className="flex items-center justify-center py-6 md:py-8">
-                  <p className="text-sm">Carregando categorias...</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
-                  {categorias.map((categoria) => (
-                    <div
-                      key={categoria.id}
-                      className="p-4 border rounded-lg"
-                    >
-                      {editandoCorCategoria === categoria.id ? (
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-3">
-                            <div
-                              className="w-4 h-4 rounded-full"
-                              style={{ backgroundColor: corSelecionada }}
-                            />
-                            <span className="font-medium">{categoria.nome}</span>
-                          </div>
-                          
-                          <div className="space-y-2">
-                            <Label className="text-sm">Escolha uma cor:</Label>
-                            <div className="flex flex-wrap gap-2">
-                              {cores.map((cor) => (
-                                <button
-                                  key={cor}
-                                  className={`w-8 h-8 rounded-full border-2 ${
-                                    corSelecionada === cor ? 'border-gray-800' : 'border-gray-300'
-                                  }`}
-                                  style={{ backgroundColor: cor }}
-                                  onClick={() => setCorSelecionada(cor)}
-                                />
-                              ))}
+              {/* Categorias fixas, sem opção de alteração */}
+              <Card>
+                <CardHeader className="pb-4 md:pb-6">
+                  <CardTitle className="text-lg md:text-xl">Categorias Disponíveis</CardTitle>
+                  <CardDescription className="text-sm">
+                    Categorias disponíveis para suas transações.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-4 md:p-6">
+                  {loadingCategorias ? (
+                    <div className="flex items-center justify-center py-6 md:py-8">
+                      <p className="text-sm">Carregando categorias...</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
+                      {categorias.map((categoria) => (
+                        <div
+                          key={categoria.id}
+                          className="p-4 border rounded-lg"
+                        >
+                          <div className="space-y-1">
+                            <div className="font-medium text-foreground text-base">{categoria.nome}</div>
+                            <div className="flex items-center gap-2">
+                              <span className="w-4 h-4 rounded-full" style={{ backgroundColor: categoria.cor_usuario || categoria.cor_padrao }}></span>
+                              <span className="text-xs text-muted-foreground">{categoria.cor_usuario || categoria.cor_padrao}</span>
                             </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {categorias.length === 0 && !loadingCategorias && (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <p>Nenhuma categoria disponível.</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
                           </div>
                           
                           <div className="flex gap-2">
